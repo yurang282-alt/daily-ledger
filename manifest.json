@@ -1,0 +1,19 @@
+{
+  "name": "每日收支",
+  "short_name": "收支",
+  "description": "记录每天收支明细，查看月度统计和预算提醒。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f4",
+  "theme_color": "#20785a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
