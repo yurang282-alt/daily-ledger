@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#20785a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="每日收支" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>每日收支</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="modeLabel">本地记账</p>
+          <h1>每日收支</h1>
+        </div>
+        <div class="top-actions">
+          <span class="status-pill" id="cloudStatus">本地模式 · 未登录</span>
+          <div class="auth-panel" id="authPanel">
+            <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email" />
+            <button class="secondary-button" id="sendLogin" type="button">发送验证码</button>
+            <button class="plain-button is-hidden" id="signOut" type="button">退出</button>
+          </div>
+          <div class="month-switcher" aria-label="选择统计月份">
+            <button class="icon-button" id="prevMonth" type="button" aria-label="上个月">‹</button>
+            <input id="monthPicker" type="month" />
+            <button class="icon-button" id="nextMonth" type="button" aria-label="下个月">›</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="notice sync-notice is-hidden" id="syncNotice" role="status">
+        <span id="syncMessage"></span>
+        <div class="notice-actions">
+          <button class="secondary-button" id="migrateData" type="button">同步本地数据</button>
+          <button class="plain-button" id="dismissMigration" type="button">稍后</button>
+        </div>
+      </section>
+      <section class="notice is-hidden" id="budgetNotice" role="status"></section>
+
+      <section class="summary-grid" aria-label="月度概览">
+        <article class="metric">
+          <span>本月收入</span>
+          <strong id="incomeTotal">¥0.00</strong>
+        </article>
+        <article class="metric">
+          <span>本月支出</span>
+          <strong id="expenseTotal">¥0.00</strong>
+        </article>
+        <article class="metric">
+          <span>本月结余</span>
+          <strong id="balanceTotal">¥0.00</strong>
+        </article>
+        <article class="metric budget-metric">
+          <div class="metric-heading">
+            <span>月支出上限</span>
+            <button class="plain-button" id="editBudget" type="button">设置</button>
+          </div>
+          <strong id="budgetValue">未设置</strong>
+          <div class="progress-track" aria-label="预算使用比例">
+            <span id="budgetProgress"></span>
+          </div>
+          <small id="budgetMeta">设置后将在 80% 时提醒</small>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <form class="entry-panel" id="entryForm">
+          <div class="panel-title">
+            <h2>记一笔</h2>
+            <div class="segmented" role="group" aria-label="收支类型">
+              <button class="segment is-active" type="button" data-entry-type="expense">支出</button>
+              <button class="segment" type="button" data-entry-type="income">收入</button>
+            </div>
+          </div>
+
+          <label>
+            金额
+            <input id="amountInput" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" required />
+          </label>
+
+          <div class="field-row">
+            <label>
+              分类
+              <select id="categorySelect" required></select>
+            </label>
+            <button class="secondary-button" id="showCategoryForm" type="button">新增分类</button>
+          </div>
+
+          <div class="inline-form is-hidden" id="categoryForm">
+            <input id="categoryNameInput" type="text" maxlength="12" placeholder="分类名称" />
+            <button class="icon-button" id="addCategory" type="button" aria-label="添加分类">＋</button>
+          </div>
+
+          <label>
+            日期
+            <input id="dateInput" type="date" required />
+          </label>
+
+          <label>
+            备注
+            <input id="noteInput" type="text" maxlength="40" placeholder="可选" />
+          </label>
+
+          <button class="primary-button" type="submit">保存</button>
+        </form>
+
+        <section class="analysis-panel">
+          <div class="panel-title">
+            <h2>统计分析</h2>
+            <span id="recordCount">0 笔记录</span>
+          </div>
+
+          <div class="charts-grid">
+            <article class="chart-block">
+              <div class="block-heading">
+                <h3>分类支出</h3>
+                <span id="categoryHint">暂无支出</span>
+              </div>
+              <div class="donut-wrap">
+                <div class="donut" id="categoryDonut" aria-hidden="true"></div>
+                <ul class="legend" id="categoryLegend"></ul>
+              </div>
+            </article>
+
+            <article class="chart-block">
+              <div class="block-heading">
+                <h3>每日趋势</h3>
+                <span id="trendHint">本月支出</span>
+              </div>
+              <div class="bar-chart" id="dailyTrend" aria-label="每日支出趋势"></div>
+            </article>
+          </div>
+        </section>
+      </section>
+
+      <section class="list-panel">
+        <div class="panel-title">
+          <h2>收支明细</h2>
+          <div class="list-actions">
+            <button class="plain-button" id="exportData" type="button">导出</button>
+            <button class="plain-button" id="importData" type="button">导入</button>
+            <button class="plain-button danger" id="clearMonth" type="button">清空本月</button>
+          </div>
+        </div>
+        <input class="visually-hidden" id="importFile" type="file" accept="application/json" />
+        <div class="records" id="recordsList"></div>
+      </section>
+    </main>
+
+    <dialog id="budgetDialog">
+      <form method="dialog" class="dialog-body" id="budgetForm">
+        <h2>设置月支出上限</h2>
+        <label>
+          上限金额
+          <input id="budgetInput" type="number" inputmode="decimal" min="0" step="0.01" placeholder="例如 5000" />
+        </label>
+        <div class="dialog-actions">
+          <button class="secondary-button" value="cancel" type="button" id="closeBudget">取消</button>
+          <button class="primary-button" value="default" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./config.js?v=20260601-2"></script>
+    <script src="./app.js?v=20260601-2"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./service-worker.js");
+        });
+      }
+    </script>
+  </body>
+</html>
