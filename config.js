@@ -93,12 +93,13 @@ window.APP_CONFIG = {
       codeInput.type = "text";
       codeInput.inputMode = "numeric";
       codeInput.autocomplete = "one-time-code";
-      codeInput.maxLength = 6;
-      codeInput.placeholder = "6 位验证码";
       codeInput.style.width = "110px";
       codeInput.style.textAlign = "center";
       sendButton.insertAdjacentElement("afterend", codeInput);
     }
+    codeInput.maxLength = 8;
+    codeInput.placeholder = "8 位验证码";
+
     if (!verifyButton) {
       verifyButton = document.createElement("button");
       verifyButton.className = "secondary-button is-hidden";
@@ -141,7 +142,7 @@ window.APP_CONFIG = {
     verifyButton.classList.remove("is-hidden");
     codeInput.value = "";
     codeInput.focus();
-    showMessage("验证码已发送，请在这里输入邮件里的 6 位验证码。");
+    showMessage("验证码已发送，请在这里输入邮件里的 8 位验证码。");
   }
 
   async function verifyOtp() {
@@ -153,7 +154,7 @@ window.APP_CONFIG = {
     const client = getClient();
     if (!emailInput || !codeInput || !verifyButton || !client) return;
     if (!email) return emailInput.focus();
-    if (!token || token.length < 6) return codeInput.focus();
+    if (!token || token.length < 8) return codeInput.focus();
 
     verifyButton.disabled = true;
     verifyButton.textContent = "验证中";
