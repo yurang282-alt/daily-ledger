@@ -69,4 +69,8 @@
   .auth-panel #sendLogin {
     grid-column: 1 / -1;
   }
+
+  .auth-panel.auth-panel--signed-in #passwordSignup {
+    grid-column: 1 / -1;
+  }
 }
