@@ -25,6 +25,8 @@
           <div class="auth-panel" id="authPanel">
             <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email" />
             <button class="secondary-button" id="sendLogin" type="button">发送验证码</button>
+            <input class="is-hidden" id="authCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位验证码" />
+            <button class="secondary-button is-hidden" id="verifyLogin" type="button">验证登录</button>
             <button class="plain-button is-hidden" id="signOut" type="button">退出</button>
           </div>
           <div class="month-switcher" aria-label="选择统计月份">
@@ -168,8 +170,8 @@
       </form>
     </dialog>
 
-    <script src="./config.js?v=20260601-2"></script>
-    <script src="./app.js?v=20260601-2"></script>
+    <script src="./config.js?v=20260602-otp"></script>
+    <script src="./app.js?v=20260602-otp"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
