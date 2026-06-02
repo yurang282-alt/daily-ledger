@@ -8,12 +8,21 @@ window.APP_CONFIG = {
   let supabaseNamespace;
   let handledRedirect = false;
 
+  Object.defineProperty(window, "supabase", {
+    configurable: true,
+    get() {
+      return supabaseNamespace;
+    },
+    set(nextNamespace) {
+      supabaseNamespace = patchNamespace(nextNamespace);
+    },
+  });
+
   function patchNamespace(namespace) {
     if (!namespace || namespace.__dailyLedgerPatched) return namespace;
     const createClient = namespace.createClient.bind(namespace);
-
     namespace.createClient = (...args) => {
-      const options = {
+      const client = createClient(args[0], args[1], {
         ...(args[2] || {}),
         auth: {
           persistSession: true,
@@ -22,19 +31,15 @@ window.APP_CONFIG = {
           storageKey: authStorageKey,
           ...((args[2] || {}).auth || {}),
         },
-      };
-      const client = createClient(args[0], args[1], options);
+      });
       window.__dailyLedgerSupabaseClient = client;
       const getSession = client.auth.getSession.bind(client.auth);
-
       client.auth.getSession = async (...sessionArgs) => {
         await exchangeCodeOnce(client);
         return getSession(...sessionArgs);
       };
-
       return client;
     };
-
     namespace.__dailyLedgerPatched = true;
     return namespace;
   }
@@ -51,18 +56,9 @@ window.APP_CONFIG = {
     window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
   }
 
-  Object.defineProperty(window, "supabase", {
-    configurable: true,
-    get() {
-      return supabaseNamespace;
-    },
-    set(nextNamespace) {
-      supabaseNamespace = patchNamespace(nextNamespace);
-    },
-  });
-
   window.addEventListener("DOMContentLoaded", () => {
     installOtpLogin();
+    installExpenseOnlyMode();
     installMobileExperience();
   });
 
@@ -73,10 +69,7 @@ window.APP_CONFIG = {
   }
 
   function showMessage(message, kind = "info") {
-    if (typeof window.showNotice === "function") {
-      window.showNotice(message, kind);
-      return;
-    }
+    if (typeof window.showNotice === "function") return window.showNotice(message, kind);
     const notice = document.querySelector("#syncNotice");
     const text = document.querySelector("#syncMessage");
     if (!notice || !text) return;
@@ -133,24 +126,17 @@ window.APP_CONFIG = {
     const email = emailInput?.value.trim();
     const client = getClient();
     if (!sendButton || !emailInput || !codeInput || !verifyButton || !client) return;
-
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (!email) {
-      emailInput.focus();
-      return;
-    }
+    if (!email) return emailInput.focus();
 
     sendButton.disabled = true;
     sendButton.textContent = "发送中";
     const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
     sendButton.disabled = false;
     sendButton.textContent = "发送验证码";
+    if (error) return showMessage(`验证码发送失败：${error.message}`, "error");
 
-    if (error) {
-      showMessage(`验证码发送失败：${error.message}`, "error");
-      return;
-    }
     codeInput.classList.remove("is-hidden");
     verifyButton.classList.remove("is-hidden");
     codeInput.value = "";
@@ -174,13 +160,23 @@ window.APP_CONFIG = {
     const { error } = await client.auth.verifyOtp({ email, token, type: "email" });
     verifyButton.disabled = false;
     verifyButton.textContent = "验证登录";
+    if (error) return showMessage(`登录失败：${error.message}`, "error");
 
-    if (error) {
-      showMessage(`登录失败：${error.message}`, "error");
-      return;
-    }
     showMessage("登录成功，正在同步云端数据。", "success");
     window.setTimeout(() => window.location.reload(), 600);
+  }
+
+  function installExpenseOnlyMode() {
+    const apply = () => {
+      document.querySelector("#incomeTotal")?.closest(".metric")?.remove();
+      document.querySelector("#balanceTotal")?.closest(".metric")?.remove();
+      document.querySelector('[data-entry-type="income"]')?.remove();
+      document.querySelector('[data-entry-type="expense"]')?.closest(".segmented")?.remove();
+      document.querySelectorAll(".tag.income").forEach((tag) => tag.closest(".record-row")?.remove());
+      document.querySelectorAll(".record-amount.income").forEach((amount) => amount.closest(".record-row")?.remove());
+    };
+    apply();
+    new MutationObserver(apply).observe(document.body, { childList: true, subtree: true });
   }
 
   function installMobileExperience() {
@@ -201,31 +197,15 @@ window.APP_CONFIG = {
         .app-shell { width: min(100% - 20px, 1180px); padding-top: 14px; }
         h1 { font-size: 30px; }
         .topbar { gap: 12px; }
-        .summary-grid { gap: 10px; margin-bottom: 12px; }
+        .summary-grid { grid-template-columns: 1fr; gap: 10px; margin-bottom: 12px; }
         .metric { min-height: auto; padding: 14px; }
         .metric strong { font-size: 23px; }
         .workspace { gap: 12px; }
-        .entry-panel {
-          display: block !important;
-          position: static !important;
-          max-height: none !important;
-          overflow: visible !important;
-          padding: 14px !important;
-          border-radius: 8px !important;
-          transform: none !important;
-          box-shadow: var(--shadow) !important;
-        }
+        .entry-panel { display: block !important; position: static !important; max-height: none !important; overflow: visible !important; padding: 14px !important; border-radius: 8px !important; transform: none !important; box-shadow: var(--shadow) !important; }
         #amountInput { min-height: 56px; font-size: 28px; font-weight: 900; }
         .field-row { display: grid; grid-template-columns: 1fr auto; }
         .analysis-panel, .list-panel { padding: 14px; }
-        .mobile-chart-tabs {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          margin-bottom: 12px;
-          padding: 4px;
-          border-radius: 8px;
-          background: var(--surface-soft);
-        }
+        .mobile-chart-tabs { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 12px; padding: 4px; border-radius: 8px; background: var(--surface-soft); }
         .charts-grid { display: block; }
         .chart-block[data-chart-panel] { display: none; min-height: 0; padding: 0; border: 0; box-shadow: none; }
         .chart-block[data-chart-panel].is-active { display: block; }
@@ -245,23 +225,7 @@ window.APP_CONFIG = {
         .bar:hover::after { display: none; }
         .record-row { align-items: flex-start; padding: 13px 0; }
         .record-amount > div { display: none; }
-        .mobile-add-button {
-          width: 58px;
-          height: 58px;
-          display: grid;
-          place-items: center;
-          position: fixed;
-          right: 18px;
-          bottom: calc(18px + env(safe-area-inset-bottom));
-          z-index: 30;
-          border: 0;
-          border-radius: 18px;
-          background: var(--green);
-          color: #fff;
-          box-shadow: 0 14px 28px rgba(32, 120, 90, 0.32);
-          font-size: 32px;
-          line-height: 1;
-        }
+        .mobile-add-button { width: 58px; height: 58px; display: grid; place-items: center; position: fixed; right: 18px; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 30; border: 0; border-radius: 18px; background: var(--green); color: #fff; box-shadow: 0 14px 28px rgba(32, 120, 90, 0.32); font-size: 32px; line-height: 1; }
         .mobile-sheet-backdrop { display: none !important; }
       }
     `;
