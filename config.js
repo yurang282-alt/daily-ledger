@@ -5,8 +5,11 @@ window.APP_CONFIG = {
 
 (function dailyLedgerRuntimePatch() {
   const authStorageKey = "daily-ledger-supabase-auth";
+  const authBackupKey = "daily-ledger-auth-session-backup-v1";
   let supabaseNamespace;
   let handledRedirect = false;
+
+  ensureLegacyMetricCompatibility();
 
   Object.defineProperty(window, "supabase", {
     configurable: true,
@@ -36,12 +39,57 @@ window.APP_CONFIG = {
       const getSession = client.auth.getSession.bind(client.auth);
       client.auth.getSession = async (...sessionArgs) => {
         await exchangeCodeOnce(client);
+        await restoreSessionFromBackup(client, getSession);
         return getSession(...sessionArgs);
       };
+      client.auth.onAuthStateChange((event, session) => {
+        if (event === "SIGNED_OUT") {
+          localStorage.removeItem(authBackupKey);
+          return;
+        }
+        saveSessionBackup(session);
+      });
       return client;
     };
     namespace.__dailyLedgerPatched = true;
     return namespace;
+  }
+
+  function saveSessionBackup(session) {
+    if (!session?.access_token || !session?.refresh_token) return;
+    localStorage.setItem(
+      authBackupKey,
+      JSON.stringify({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_at: session.expires_at || 0,
+        email: session.user?.email || "",
+      }),
+    );
+  }
+
+  async function restoreSessionFromBackup(client, getSession) {
+    if (client.__dailyLedgerSessionRestored) return;
+    client.__dailyLedgerSessionRestored = true;
+
+    const current = await getSession();
+    if (current.data?.session) {
+      saveSessionBackup(current.data.session);
+      return;
+    }
+
+    try {
+      const backup = JSON.parse(localStorage.getItem(authBackupKey) || "null");
+      if (!backup?.access_token || !backup?.refresh_token) return;
+      const { data, error } = await client.auth.setSession({
+        access_token: backup.access_token,
+        refresh_token: backup.refresh_token,
+      });
+      if (error) throw error;
+      saveSessionBackup(data?.session);
+    } catch {
+      localStorage.removeItem(authBackupKey);
+    }
   }
 
   async function exchangeCodeOnce(client) {
@@ -50,8 +98,9 @@ window.APP_CONFIG = {
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
     if (!code || !client?.auth?.exchangeCodeForSession) return;
-    const { error } = await client.auth.exchangeCodeForSession(code);
+    const { data, error } = await client.auth.exchangeCodeForSession(code);
     if (error) throw error;
+    saveSessionBackup(data?.session);
     url.searchParams.delete("code");
     window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
   }
@@ -77,6 +126,24 @@ window.APP_CONFIG = {
     notice.classList.remove("is-hidden", "is-success", "is-error");
     notice.classList.toggle("is-success", kind === "success");
     notice.classList.toggle("is-error", kind === "error");
+  }
+
+  function ensureLegacyMetricCompatibility() {
+    const summary = document.querySelector(".summary-grid");
+    if (!summary) return;
+
+    const ensureHiddenMetric = (id) => {
+      if (document.querySelector(`#${id}`)) return;
+      const article = document.createElement("article");
+      article.className = "metric daily-ledger-compat-metric";
+      article.hidden = true;
+      article.style.display = "none";
+      article.innerHTML = `<span></span><strong id="${id}">¥0.00</strong>`;
+      summary.append(article);
+    };
+
+    ensureHiddenMetric("incomeTotal");
+    ensureHiddenMetric("balanceTotal");
   }
 
   function installOtpLogin() {
@@ -158,19 +225,23 @@ window.APP_CONFIG = {
 
     verifyButton.disabled = true;
     verifyButton.textContent = "验证中";
-    const { error } = await client.auth.verifyOtp({ email, token, type: "email" });
+    const { data, error } = await client.auth.verifyOtp({ email, token, type: "email" });
     verifyButton.disabled = false;
     verifyButton.textContent = "验证登录";
     if (error) return showMessage(`登录失败：${error.message}`, "error");
 
+    saveSessionBackup(data?.session);
     showMessage("登录成功，正在同步云端数据。", "success");
     window.setTimeout(() => window.location.reload(), 600);
   }
 
   function installExpenseOnlyMode() {
     const apply = () => {
-      document.querySelector("#incomeTotal")?.closest(".metric")?.remove();
-      document.querySelector("#balanceTotal")?.closest(".metric")?.remove();
+      ensureLegacyMetricCompatibility();
+      document.querySelectorAll(".daily-ledger-compat-metric").forEach((metric) => {
+        metric.hidden = true;
+        metric.style.display = "none";
+      });
       document.querySelector('[data-entry-type="income"]')?.remove();
       document.querySelector('[data-entry-type="expense"]')?.closest(".segmented")?.remove();
       document.querySelectorAll(".tag.income").forEach((tag) => tag.closest(".record-row")?.remove());
@@ -193,6 +264,7 @@ window.APP_CONFIG = {
     style.id = "dailyLedgerMobileStyles";
     style.textContent = `
       .mobile-chart-tabs, .mobile-add-button { display: none; }
+      .daily-ledger-compat-metric { display: none !important; }
       @media (max-width: 680px) {
         body { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
         .app-shell { width: min(100% - 20px, 1180px); padding-top: 14px; }
