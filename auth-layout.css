@@ -73,4 +73,60 @@
   .auth-panel.auth-panel--signed-in #passwordSignup {
     grid-column: 1 / -1;
   }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 12px;
+  }
+
+  .entry-panel {
+    position: static !important;
+    display: grid !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 14px !important;
+    border-radius: 8px !important;
+    transform: none !important;
+    box-shadow: var(--shadow) !important;
+  }
+
+  .mobile-entry-open .entry-panel {
+    transform: none !important;
+  }
+
+  .entry-panel label {
+    margin-bottom: 12px;
+  }
+
+  .entry-panel input,
+  .entry-panel select,
+  .entry-panel button {
+    max-width: 100%;
+  }
+
+  .field-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+  }
+
+  #noteInput {
+    min-height: 42px;
+  }
+
+  .mobile-sheet-backdrop,
+  .mobile-entry-open .mobile-sheet-backdrop {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  body.mobile-entry-open {
+    overflow: auto !important;
+  }
 }
