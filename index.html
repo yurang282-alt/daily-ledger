@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260602-otp8" />
   </head>
   <body>
     <main class="app-shell">
@@ -25,7 +25,7 @@
           <div class="auth-panel" id="authPanel">
             <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email" />
             <button class="secondary-button" id="sendLogin" type="button">发送验证码</button>
-            <input class="is-hidden" id="authCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位验证码" />
+            <input class="is-hidden" id="authCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="8 位验证码" />
             <button class="secondary-button is-hidden" id="verifyLogin" type="button">验证登录</button>
             <button class="plain-button is-hidden" id="signOut" type="button">退出</button>
           </div>
@@ -47,17 +47,9 @@
       <section class="notice is-hidden" id="budgetNotice" role="status"></section>
 
       <section class="summary-grid" aria-label="月度概览">
-        <article class="metric">
-          <span>本月收入</span>
-          <strong id="incomeTotal">¥0.00</strong>
-        </article>
-        <article class="metric">
+        <article class="metric spending-metric">
           <span>本月支出</span>
           <strong id="expenseTotal">¥0.00</strong>
-        </article>
-        <article class="metric">
-          <span>本月结余</span>
-          <strong id="balanceTotal">¥0.00</strong>
         </article>
         <article class="metric budget-metric">
           <div class="metric-heading">
@@ -76,10 +68,6 @@
         <form class="entry-panel" id="entryForm">
           <div class="panel-title">
             <h2>记一笔</h2>
-            <div class="segmented" role="group" aria-label="收支类型">
-              <button class="segment is-active" type="button" data-entry-type="expense">支出</button>
-              <button class="segment" type="button" data-entry-type="income">收入</button>
-            </div>
           </div>
 
           <label>
@@ -119,8 +107,13 @@
             <span id="recordCount">0 笔记录</span>
           </div>
 
+          <div class="mobile-chart-tabs" role="tablist" aria-label="手机端统计视图">
+            <button class="segment is-active" type="button" data-chart-tab="category">分类</button>
+            <button class="segment" type="button" data-chart-tab="trend">趋势</button>
+          </div>
+
           <div class="charts-grid">
-            <article class="chart-block">
+            <article class="chart-block" data-chart-panel="category">
               <div class="block-heading">
                 <h3>分类支出</h3>
                 <span id="categoryHint">暂无支出</span>
@@ -131,7 +124,7 @@
               </div>
             </article>
 
-            <article class="chart-block">
+            <article class="chart-block" data-chart-panel="trend">
               <div class="block-heading">
                 <h3>每日趋势</h3>
                 <span id="trendHint">本月支出</span>
@@ -170,8 +163,11 @@
       </form>
     </dialog>
 
-    <script src="./config.js?v=20260602-otp"></script>
-    <script src="./app.js?v=20260602-otp"></script>
+    <button class="mobile-add-button" id="mobileAddRecord" type="button" aria-label="记一笔">＋</button>
+    <div class="mobile-sheet-backdrop" id="mobileSheetBackdrop" aria-hidden="true"></div>
+
+    <script src="./config.js?v=20260602-otp8"></script>
+    <script src="./app.js?v=20260602-otp8"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
