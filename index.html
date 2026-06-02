@@ -11,8 +11,167 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260602-formfix" />
-    <link rel="stylesheet" href="./auth-layout.css?v=20260602-formfix" />
+    <link rel="stylesheet" href="./styles.css?v=20260602-stable" />
+    <link rel="stylesheet" href="./auth-layout.css?v=20260602-stable" />
+    <style>
+      @media (max-width: 680px) {
+        html,
+        body {
+          height: auto !important;
+          min-height: 0 !important;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+        }
+
+        body {
+          padding-bottom: 0 !important;
+        }
+
+        .app-shell {
+          display: block !important;
+          width: 100% !important;
+          max-width: 480px !important;
+          margin: 0 auto !important;
+          padding: max(14px, env(safe-area-inset-top)) 12px calc(32px + env(safe-area-inset-bottom)) !important;
+        }
+
+        .topbar,
+        .top-actions,
+        .auth-panel,
+        .summary-grid,
+        .workspace,
+        .charts-grid,
+        .donut-wrap {
+          display: block !important;
+          width: 100% !important;
+        }
+
+        .topbar,
+        .summary-grid,
+        .workspace,
+        .analysis-panel,
+        .list-panel {
+          margin-bottom: 12px !important;
+        }
+
+        .top-actions,
+        .auth-panel {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: 10px !important;
+        }
+
+        .month-switcher {
+          display: grid !important;
+          grid-template-columns: 42px minmax(0, 1fr) 42px !important;
+          gap: 8px !important;
+          margin-top: 10px !important;
+        }
+
+        .summary-grid {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: 10px !important;
+        }
+
+        .entry-panel {
+          position: static !important;
+          inset: auto !important;
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 12px !important;
+          width: 100% !important;
+          height: auto !important;
+          min-height: 0 !important;
+          max-height: none !important;
+          overflow: visible !important;
+          margin: 0 0 12px !important;
+          padding: 14px !important;
+          transform: none !important;
+        }
+
+        .entry-panel .panel-title,
+        .entry-panel label,
+        .field-row,
+        .inline-form {
+          display: block !important;
+          width: 100% !important;
+          height: auto !important;
+          min-height: 0 !important;
+          max-height: none !important;
+          margin: 0 !important;
+          overflow: visible !important;
+        }
+
+        .field-row {
+          display: grid !important;
+          grid-template-columns: minmax(0, 1fr) 108px !important;
+          gap: 10px !important;
+          align-items: end !important;
+        }
+
+        .entry-panel input,
+        .entry-panel select,
+        .entry-panel button,
+        .auth-panel input,
+        .auth-panel button {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+        }
+
+        .entry-panel input,
+        .entry-panel select {
+          display: block !important;
+          height: 44px !important;
+          min-height: 44px !important;
+          max-height: 44px !important;
+          margin-top: 7px !important;
+        }
+
+        #amountInput {
+          height: 56px !important;
+          min-height: 56px !important;
+          max-height: 56px !important;
+        }
+
+        .entry-panel .primary-button {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          height: 46px !important;
+          min-height: 46px !important;
+          margin-top: 0 !important;
+        }
+
+        .analysis-panel,
+        .list-panel,
+        .metric {
+          padding: 14px !important;
+        }
+
+        .mobile-chart-tabs {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 0 !important;
+          margin-bottom: 12px !important;
+        }
+
+        .chart-block {
+          min-height: 0 !important;
+        }
+
+        .mobile-add-button,
+        .mobile-sheet-backdrop {
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
+          min-height: 0 !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+      }
+    </style>
   </head>
   <body>
     <main class="app-shell">
@@ -167,9 +326,9 @@
     <button class="mobile-add-button" id="mobileAddRecord" type="button" aria-label="记一笔">＋</button>
     <div class="mobile-sheet-backdrop" id="mobileSheetBackdrop" aria-hidden="true"></div>
 
-    <script src="./config.js?v=20260602-formfix"></script>
-    <script src="./password-auth.js?v=20260602-formfix"></script>
-    <script src="./app.js?v=20260602-formfix"></script>
+    <script src="./config.js?v=20260602-stable"></script>
+    <script src="./password-auth.js?v=20260602-stable"></script>
+    <script src="./app.js?v=20260602-stable"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
