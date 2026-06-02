@@ -3,30 +3,15 @@ window.APP_CONFIG = {
   supabaseAnonKey: "sb_publishable_09JhpElaWE7YRPgMupCepA_CUanSZhZ",
 };
 
-(function patchSupabaseAuthRedirect() {
-  let supabaseNamespace;
-  let handled = false;
+(function dailyLedgerRuntimePatch() {
   const authStorageKey = "daily-ledger-supabase-auth";
-
-  async function exchangeCodeOnce(client) {
-    if (handled) return;
-    handled = true;
-
-    const url = new URL(window.location.href);
-    const code = url.searchParams.get("code");
-    if (!code || !client?.auth?.exchangeCodeForSession) return;
-
-    const { error } = await client.auth.exchangeCodeForSession(code);
-    if (error) throw error;
-
-    url.searchParams.delete("code");
-    window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
-  }
+  let supabaseNamespace;
+  let handledRedirect = false;
 
   function patchNamespace(namespace) {
     if (!namespace || namespace.__dailyLedgerPatched) return namespace;
-
     const createClient = namespace.createClient.bind(namespace);
+
     namespace.createClient = (...args) => {
       const options = {
         ...(args[2] || {}),
@@ -54,6 +39,18 @@ window.APP_CONFIG = {
     return namespace;
   }
 
+  async function exchangeCodeOnce(client) {
+    if (handledRedirect) return;
+    handledRedirect = true;
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    if (!code || !client?.auth?.exchangeCodeForSession) return;
+    const { error } = await client.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    url.searchParams.delete("code");
+    window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+  }
+
   Object.defineProperty(window, "supabase", {
     configurable: true,
     get() {
@@ -64,12 +61,22 @@ window.APP_CONFIG = {
     },
   });
 
+  window.addEventListener("DOMContentLoaded", () => {
+    installOtpLogin();
+    installMobileExperience();
+  });
+
+  function getClient() {
+    if (window.__dailyLedgerSupabaseClient) return window.__dailyLedgerSupabaseClient;
+    if (!window.supabase?.createClient) return null;
+    return window.supabase.createClient(window.APP_CONFIG.supabaseUrl, window.APP_CONFIG.supabaseAnonKey);
+  }
+
   function showMessage(message, kind = "info") {
     if (typeof window.showNotice === "function") {
       window.showNotice(message, kind);
       return;
     }
-
     const notice = document.querySelector("#syncNotice");
     const text = document.querySelector("#syncMessage");
     if (!notice || !text) return;
@@ -79,36 +86,43 @@ window.APP_CONFIG = {
     notice.classList.toggle("is-error", kind === "error");
   }
 
-  function ensureOtpControls() {
+  function installOtpLogin() {
     const panel = document.querySelector("#authPanel");
     const sendButton = document.querySelector("#sendLogin");
-    if (!panel || !sendButton || document.querySelector("#authCode")) return;
+    if (!panel || !sendButton) return;
 
-    const codeInput = document.createElement("input");
-    codeInput.className = "is-hidden";
-    codeInput.id = "authCode";
-    codeInput.type = "text";
-    codeInput.inputMode = "numeric";
-    codeInput.autocomplete = "one-time-code";
-    codeInput.maxLength = 6;
-    codeInput.placeholder = "6 位验证码";
-    codeInput.style.width = "110px";
-    codeInput.style.textAlign = "center";
+    let codeInput = document.querySelector("#authCode");
+    let verifyButton = document.querySelector("#verifyLogin");
+    if (!codeInput) {
+      codeInput = document.createElement("input");
+      codeInput.className = "is-hidden";
+      codeInput.id = "authCode";
+      codeInput.type = "text";
+      codeInput.inputMode = "numeric";
+      codeInput.autocomplete = "one-time-code";
+      codeInput.maxLength = 6;
+      codeInput.placeholder = "6 位验证码";
+      codeInput.style.width = "110px";
+      codeInput.style.textAlign = "center";
+      sendButton.insertAdjacentElement("afterend", codeInput);
+    }
+    if (!verifyButton) {
+      verifyButton = document.createElement("button");
+      verifyButton.className = "secondary-button is-hidden";
+      verifyButton.id = "verifyLogin";
+      verifyButton.type = "button";
+      verifyButton.textContent = "验证登录";
+      codeInput.insertAdjacentElement("afterend", verifyButton);
+    }
 
-    const verifyButton = document.createElement("button");
-    verifyButton.className = "secondary-button is-hidden";
-    verifyButton.id = "verifyLogin";
-    verifyButton.type = "button";
-    verifyButton.textContent = "验证登录";
-
-    sendButton.insertAdjacentElement("afterend", verifyButton);
-    sendButton.insertAdjacentElement("afterend", codeInput);
-  }
-
-  function getClient() {
-    if (window.__dailyLedgerSupabaseClient) return window.__dailyLedgerSupabaseClient;
-    if (!window.supabase?.createClient) return null;
-    return window.supabase.createClient(window.APP_CONFIG.supabaseUrl, window.APP_CONFIG.supabaseAnonKey);
+    sendButton.addEventListener("click", sendOtp, true);
+    verifyButton.addEventListener("click", verifyOtp);
+    codeInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        verifyOtp();
+      }
+    });
   }
 
   async function sendOtp(event) {
@@ -118,11 +132,10 @@ window.APP_CONFIG = {
     const verifyButton = document.querySelector("#verifyLogin");
     const email = emailInput?.value.trim();
     const client = getClient();
-
     if (!sendButton || !emailInput || !codeInput || !verifyButton || !client) return;
+
     event.preventDefault();
     event.stopImmediatePropagation();
-
     if (!email) {
       emailInput.focus();
       return;
@@ -130,10 +143,7 @@ window.APP_CONFIG = {
 
     sendButton.disabled = true;
     sendButton.textContent = "发送中";
-    const { error } = await client.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
-    });
+    const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
     sendButton.disabled = false;
     sendButton.textContent = "发送验证码";
 
@@ -141,7 +151,6 @@ window.APP_CONFIG = {
       showMessage(`验证码发送失败：${error.message}`, "error");
       return;
     }
-
     codeInput.classList.remove("is-hidden");
     verifyButton.classList.remove("is-hidden");
     codeInput.value = "";
@@ -156,16 +165,9 @@ window.APP_CONFIG = {
     const email = emailInput?.value.trim();
     const token = codeInput?.value.trim();
     const client = getClient();
-
     if (!emailInput || !codeInput || !verifyButton || !client) return;
-    if (!email) {
-      emailInput.focus();
-      return;
-    }
-    if (!token || token.length < 6) {
-      codeInput.focus();
-      return;
-    }
+    if (!email) return emailInput.focus();
+    if (!token || token.length < 6) return codeInput.focus();
 
     verifyButton.disabled = true;
     verifyButton.textContent = "验证中";
@@ -177,41 +179,23 @@ window.APP_CONFIG = {
       showMessage(`登录失败：${error.message}`, "error");
       return;
     }
-
     showMessage("登录成功，正在同步云端数据。", "success");
     window.setTimeout(() => window.location.reload(), 600);
   }
 
-  window.addEventListener("DOMContentLoaded", () => {
-    ensureOtpControls();
-    installMobileExperience();
-    document.querySelector("#sendLogin")?.addEventListener("click", sendOtp, true);
-    document.querySelector("#verifyLogin")?.addEventListener("click", verifyOtp);
-    document.querySelector("#authCode")?.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        verifyOtp();
-      }
-    });
-  });
-
   function installMobileExperience() {
     injectMobileStyles();
-    ensureMobileControls();
-    wireMobileEntrySheet();
-    wireMobileChartTabs();
+    installMobileFab();
+    installMobileChartTabs();
     observeCategoryRanks();
   }
 
   function injectMobileStyles() {
     if (document.querySelector("#dailyLedgerMobileStyles")) return;
-
     const style = document.createElement("style");
     style.id = "dailyLedgerMobileStyles";
     style.textContent = `
-      .mobile-chart-tabs,
-      .mobile-add-button,
-      .mobile-sheet-backdrop { display: none; }
+      .mobile-chart-tabs, .mobile-add-button { display: none; }
       @media (max-width: 680px) {
         body { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
         .app-shell { width: min(100% - 20px, 1180px); padding-top: 14px; }
@@ -222,28 +206,18 @@ window.APP_CONFIG = {
         .metric strong { font-size: 23px; }
         .workspace { gap: 12px; }
         .entry-panel {
-          position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 40;
-          max-height: min(86vh, 690px);
-          overflow: auto;
-          padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
-          border-right: 0;
-          border-bottom: 0;
-          border-left: 0;
-          border-radius: 16px 16px 0 0;
-          box-shadow: 0 -18px 45px rgba(24, 33, 29, 0.18);
-          transform: translateY(calc(100% + 18px));
-          transition: transform 220ms ease;
+          display: block !important;
+          position: static !important;
+          max-height: none !important;
+          overflow: visible !important;
+          padding: 14px !important;
+          border-radius: 8px !important;
+          transform: none !important;
+          box-shadow: var(--shadow) !important;
         }
-        .mobile-entry-open .entry-panel { transform: translateY(0); }
-        .entry-panel .panel-title { align-items: start; margin-bottom: 14px; }
         #amountInput { min-height: 56px; font-size: 28px; font-weight: 900; }
         .field-row { display: grid; grid-template-columns: 1fr auto; }
-        .analysis-panel,
-        .list-panel { padding: 14px; }
+        .analysis-panel, .list-panel { padding: 14px; }
         .mobile-chart-tabs {
           display: grid;
           grid-template-columns: 1fr 1fr;
@@ -253,42 +227,17 @@ window.APP_CONFIG = {
           background: var(--surface-soft);
         }
         .charts-grid { display: block; }
-        .chart-block[data-chart-panel] {
-          display: none;
-          min-height: 0;
-          padding: 0;
-          border: 0;
-          box-shadow: none;
-        }
+        .chart-block[data-chart-panel] { display: none; min-height: 0; padding: 0; border: 0; box-shadow: none; }
         .chart-block[data-chart-panel].is-active { display: block; }
         .donut { display: none; }
         .donut-wrap { display: block; }
         .legend { gap: 12px; max-height: none; overflow: visible; }
-        .legend li {
-          position: relative;
-          grid-template-columns: minmax(0, 1fr) auto;
-          gap: 8px 12px;
-          padding: 0 0 14px;
-          font-size: 14px;
-        }
-        .legend li::before,
-        .legend li::after {
-          content: "";
-          position: absolute;
-          left: 0;
-          bottom: 0;
-          height: 6px;
-          border-radius: 999px;
-        }
+        .legend li { position: relative; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 0 0 14px; font-size: 14px; }
+        .legend li::before, .legend li::after { content: ""; position: absolute; left: 0; bottom: 0; height: 6px; border-radius: 999px; }
         .legend li::before { right: 0; background: var(--surface-soft); }
-        .legend li::after {
-          right: calc(100% - var(--rank-size, 0%));
-          z-index: 1;
-          background: var(--green);
-        }
+        .legend li::after { right: calc(100% - var(--rank-size, 0%)); z-index: 1; background: var(--green); }
         .legend li.empty-state { display: block; padding: 0; }
-        .legend li.empty-state::before,
-        .legend li.empty-state::after { display: none; }
+        .legend li.empty-state::before, .legend li.empty-state::after { display: none; }
         .legend i { display: none; }
         .legend b { grid-column: 1; }
         .legend span { grid-column: 2; }
@@ -313,47 +262,16 @@ window.APP_CONFIG = {
           font-size: 32px;
           line-height: 1;
         }
-        .mobile-entry-open .mobile-add-button { display: none; }
-        .mobile-sheet-backdrop {
-          position: fixed;
-          inset: 0;
-          z-index: 35;
-          background: rgba(24, 33, 29, 0.34);
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 180ms ease;
-        }
-        .mobile-entry-open .mobile-sheet-backdrop {
-          display: block;
-          opacity: 1;
-          pointer-events: auto;
-        }
+        .mobile-sheet-backdrop { display: none !important; }
       }
     `;
     document.head.append(style);
   }
 
-  function ensureMobileControls() {
-    const analysisPanel = document.querySelector(".analysis-panel");
-    const chartsGrid = document.querySelector(".charts-grid");
-    const chartBlocks = [...document.querySelectorAll(".chart-block")];
-    if (analysisPanel && chartsGrid && !document.querySelector(".mobile-chart-tabs")) {
-      const tabs = document.createElement("div");
-      tabs.className = "mobile-chart-tabs";
-      tabs.setAttribute("role", "tablist");
-      tabs.setAttribute("aria-label", "手机端统计视图");
-      tabs.innerHTML = `
-        <button class="segment is-active" type="button" data-chart-tab="category">分类</button>
-        <button class="segment" type="button" data-chart-tab="trend">趋势</button>
-      `;
-      chartsGrid.before(tabs);
-    }
-    chartBlocks[0]?.setAttribute("data-chart-panel", "category");
-    chartBlocks[1]?.setAttribute("data-chart-panel", "trend");
-    chartBlocks[0]?.classList.add("is-active");
-
-    if (!document.querySelector("#mobileAddRecord")) {
-      const addButton = document.createElement("button");
+  function installMobileFab() {
+    let addButton = document.querySelector("#mobileAddRecord");
+    if (!addButton) {
+      addButton = document.createElement("button");
       addButton.className = "mobile-add-button";
       addButton.id = "mobileAddRecord";
       addButton.type = "button";
@@ -361,74 +279,43 @@ window.APP_CONFIG = {
       addButton.textContent = "＋";
       document.body.append(addButton);
     }
+    addButton.addEventListener("click", () => {
+      const form = document.querySelector("#entryForm");
+      const amountInput = document.querySelector("#amountInput");
+      form?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.setTimeout(() => amountInput?.focus(), 180);
+    });
+  }
 
-    if (!document.querySelector("#mobileSheetBackdrop")) {
-      const backdrop = document.createElement("div");
-      backdrop.className = "mobile-sheet-backdrop";
-      backdrop.id = "mobileSheetBackdrop";
-      backdrop.setAttribute("aria-hidden", "true");
-      document.body.append(backdrop);
+  function installMobileChartTabs() {
+    const chartsGrid = document.querySelector(".charts-grid");
+    const chartBlocks = [...document.querySelectorAll(".chart-block")];
+    if (!chartsGrid || chartBlocks.length < 2) return;
+    chartBlocks[0].setAttribute("data-chart-panel", "category");
+    chartBlocks[1].setAttribute("data-chart-panel", "trend");
+    if (!document.querySelector(".mobile-chart-tabs")) {
+      const tabs = document.createElement("div");
+      tabs.className = "mobile-chart-tabs";
+      tabs.innerHTML = '<button class="segment is-active" type="button" data-chart-tab="category">分类</button><button class="segment" type="button" data-chart-tab="trend">趋势</button>';
+      chartsGrid.before(tabs);
     }
-  }
-
-  function wireMobileEntrySheet() {
-    const form = document.querySelector("#entryForm");
-    const amountInput = document.querySelector("#amountInput");
-    const saveButton = document.querySelector("#entryForm .primary-button");
-    const open = () => {
-      document.body.classList.add("mobile-entry-open");
-      form?.setAttribute("aria-modal", "true");
-      window.setTimeout(() => amountInput?.focus(), 120);
-    };
-    const close = () => {
-      document.body.classList.remove("mobile-entry-open");
-      form?.removeAttribute("aria-modal");
-      saveButton && (saveButton.textContent = "保存");
-    };
-
-    document.querySelector("#mobileAddRecord")?.addEventListener("click", open);
-    document.querySelector("#mobileSheetBackdrop")?.addEventListener("click", close);
-    form?.addEventListener("submit", () => window.setTimeout(close, 900));
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") close();
-    });
-    document.addEventListener("click", (event) => {
-      if (event.target?.matches?.(".delete-button:first-child")) {
-        window.setTimeout(open, 30);
-      }
-    });
-  }
-
-  function wireMobileChartTabs() {
     const setActive = (name) => {
-      document.querySelectorAll("[data-chart-tab]").forEach((button) => {
-        button.classList.toggle("is-active", button.dataset.chartTab === name);
-      });
-      document.querySelectorAll("[data-chart-panel]").forEach((panel) => {
-        panel.classList.toggle("is-active", panel.dataset.chartPanel === name);
-      });
+      document.querySelectorAll("[data-chart-tab]").forEach((button) => button.classList.toggle("is-active", button.dataset.chartTab === name));
+      document.querySelectorAll("[data-chart-panel]").forEach((panel) => panel.classList.toggle("is-active", panel.dataset.chartPanel === name));
     };
-
-    document.querySelectorAll("[data-chart-tab]").forEach((button) => {
-      button.addEventListener("click", () => setActive(button.dataset.chartTab));
-    });
+    document.querySelectorAll("[data-chart-tab]").forEach((button) => button.addEventListener("click", () => setActive(button.dataset.chartTab)));
     setActive("category");
   }
 
   function observeCategoryRanks() {
     const legend = document.querySelector("#categoryLegend");
     if (!legend) return;
-
     const applyRanks = () => {
       legend.querySelectorAll("li").forEach((item) => {
-        const text = item.querySelector("span")?.textContent || "";
-        const percent = Number.parseInt(text, 10);
-        if (Number.isFinite(percent)) {
-          item.style.setProperty("--rank-size", `${percent}%`);
-        }
+        const percent = Number.parseInt(item.querySelector("span")?.textContent || "", 10);
+        if (Number.isFinite(percent)) item.style.setProperty("--rank-size", `${percent}%`);
       });
     };
-
     applyRanks();
     new MutationObserver(applyRanks).observe(legend, { childList: true, subtree: true });
   }
