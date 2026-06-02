@@ -1,0 +1,72 @@
+@media (max-width: 680px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    padding-top: max(14px, env(safe-area-inset-top));
+  }
+
+  .top-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .auth-panel {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+    padding: 10px;
+    overflow: hidden;
+  }
+
+  .auth-panel input {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+    background: #fff;
+  }
+
+  .auth-panel #authEmail,
+  .auth-panel #authPassword,
+  .auth-panel #signOut {
+    grid-column: 1 / -1;
+  }
+
+  .auth-panel #authCode {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .auth-panel .secondary-button,
+  .auth-panel .plain-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 10px;
+    border-radius: 8px;
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal !important;
+    word-break: keep-all;
+  }
+
+  .auth-panel .plain-button {
+    background: var(--surface-soft);
+    color: var(--green);
+  }
+
+  .auth-panel #sendLogin {
+    grid-column: 1 / -1;
+  }
+}
