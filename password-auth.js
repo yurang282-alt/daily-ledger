@@ -39,8 +39,18 @@
     const passwordInput = document.querySelector("#authPassword");
     const loginButton = document.querySelector("#passwordLogin");
     const signupButton = document.querySelector("#passwordSignup");
-    const shouldHide = !emailInput || emailInput.classList.contains("is-hidden");
-    [passwordInput, loginButton, signupButton].forEach((item) => item?.classList.toggle("is-hidden", shouldHide));
+    const signOutButton = document.querySelector("#signOut");
+    const panel = document.querySelector("#authPanel");
+    const signedIn = Boolean(signOutButton && !signOutButton.classList.contains("is-hidden"));
+    const canShowLogin = Boolean(emailInput && !emailInput.classList.contains("is-hidden"));
+
+    panel?.classList.toggle("auth-panel--signed-in", signedIn);
+    passwordInput?.classList.toggle("is-hidden", !signedIn && !canShowLogin);
+    loginButton?.classList.toggle("is-hidden", signedIn || !canShowLogin);
+    signupButton?.classList.toggle("is-hidden", !signedIn && !canShowLogin);
+    if (signupButton) {
+      signupButton.textContent = signedIn ? "设置/更改密码" : "注册/设置密码";
+    }
   }
 
   function ensurePasswordControls() {
@@ -118,7 +128,6 @@
     const email = emailInput?.value.trim();
     const password = passwordInput?.value || "";
     if (!emailInput || !passwordInput || !signupButton || !client) return;
-    if (!email) return emailInput.focus();
     if (password.length < 6) return passwordInput.focus();
 
     signupButton.disabled = true;
@@ -128,7 +137,7 @@
     if (current.data?.session) {
       const { data, error } = await client.auth.updateUser({ password });
       signupButton.disabled = false;
-      signupButton.textContent = "注册/设置密码";
+      syncVisibility();
       if (error) {
         showMessage(`设置失败：${error.message}`, "error");
         return;
@@ -139,13 +148,19 @@
       return;
     }
 
+    if (!email) {
+      signupButton.disabled = false;
+      syncVisibility();
+      return emailInput.focus();
+    }
+
     const { data, error } = await client.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: window.location.href.split("#")[0] },
     });
     signupButton.disabled = false;
-    signupButton.textContent = "注册/设置密码";
+    syncVisibility();
 
     if (error) {
       showMessage(`设置失败：${error.message}`, "error");
