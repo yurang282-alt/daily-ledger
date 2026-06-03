@@ -11,8 +11,7 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260602-stable" />
-    <link rel="stylesheet" href="./auth-layout.css?v=20260602-stable" />
+    <link rel="stylesheet" href="./styles.css?v=20260603-password" />
     <style>
       @media (max-width: 680px) {
         html,
@@ -184,9 +183,12 @@
           <span class="status-pill" id="cloudStatus">本地模式 · 未登录</span>
           <div class="auth-panel" id="authPanel">
             <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email" />
-            <button class="secondary-button" id="sendLogin" type="button">发送验证码</button>
+            <input id="authPassword" type="password" minlength="6" placeholder="密码" autocomplete="current-password" />
+            <button class="secondary-button" id="passwordLogin" type="button">密码登录</button>
+            <button class="secondary-button" id="sendLogin" type="button">验证码备用</button>
             <input class="is-hidden" id="authCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="8 位验证码" />
             <button class="secondary-button is-hidden" id="verifyLogin" type="button">验证登录</button>
+            <button class="secondary-button is-hidden" id="savePassword" type="button">设置/更改密码</button>
             <button class="plain-button is-hidden" id="signOut" type="button">退出</button>
           </div>
           <div class="month-switcher" aria-label="选择统计月份">
@@ -326,24 +328,25 @@
     <button class="mobile-add-button" id="mobileAddRecord" type="button" aria-label="记一笔">＋</button>
     <div class="mobile-sheet-backdrop" id="mobileSheetBackdrop" aria-hidden="true"></div>
 
-    <script src="./config.js?v=20260603-otp"></script>
-    <script src="./app.js?v=20260603-otp"></script>
+    <script src="./config.js?v=20260603-password"></script>
+    <script src="./app.js?v=20260603-password"></script>
     <script>
       window.addEventListener("load", () => {
+        if (window.__dailyLedgerPasswordAuthReady) return;
+
+        const panel = document.querySelector("#authPanel");
         const emailInput = document.querySelector("#authEmail");
-        const codeInput = document.querySelector("#authCode");
+        const passwordInput = document.querySelector("#authPassword");
+        const passwordLogin = document.querySelector("#passwordLogin");
         const sendButton = document.querySelector("#sendLogin");
+        const codeInput = document.querySelector("#authCode");
         const verifyButton = document.querySelector("#verifyLogin");
+        const savePassword = document.querySelector("#savePassword");
+        const signOut = document.querySelector("#signOut");
         const notice = document.querySelector("#syncNotice");
         const message = document.querySelector("#syncMessage");
 
-        function showAuthMessage(text, kind) {
-          if (!notice || !message) return;
-          message.textContent = text;
-          notice.classList.remove("is-hidden", "is-success", "is-error");
-          notice.classList.toggle("is-success", kind === "success");
-          notice.classList.toggle("is-error", kind === "error");
-        }
+        if (!panel || !emailInput || !passwordInput || !passwordLogin || !sendButton || !codeInput || !verifyButton || !savePassword) return;
 
         function getClient() {
           if (window.__dailyLedgerSupabaseClient) return window.__dailyLedgerSupabaseClient;
@@ -359,30 +362,97 @@
           return window.__dailyLedgerSupabaseClient;
         }
 
+        function showAuthMessage(text, kind = "info") {
+          if (!notice || !message) return;
+          message.textContent = text;
+          notice.classList.remove("is-hidden", "is-success", "is-error");
+          notice.classList.toggle("is-success", kind === "success");
+          notice.classList.toggle("is-error", kind === "error");
+        }
+
+        function applyAuthUI(session) {
+          const signedIn = Boolean(session);
+          panel.classList.toggle("auth-panel--signed-in", signedIn);
+          emailInput.classList.toggle("is-hidden", signedIn);
+          passwordInput.classList.remove("is-hidden");
+          passwordLogin.classList.toggle("is-hidden", signedIn);
+          sendButton.classList.toggle("is-hidden", signedIn);
+          codeInput.classList.toggle("is-hidden", signedIn || !codeInput.value);
+          verifyButton.classList.toggle("is-hidden", signedIn || !codeInput.value);
+          savePassword.classList.toggle("is-hidden", !signedIn);
+          signOut?.classList.toggle("is-hidden", !signedIn);
+          passwordInput.placeholder = signedIn ? "新密码（至少 6 位）" : "密码";
+          passwordInput.autocomplete = signedIn ? "new-password" : "current-password";
+        }
+
+        async function refreshAuthUI() {
+          const client = getClient();
+          if (!client) return;
+          const { data } = await client.auth.getSession();
+          applyAuthUI(data?.session);
+        }
+
+        async function signInWithPassword(event) {
+          event?.preventDefault();
+          const client = getClient();
+          const email = emailInput.value.trim();
+          const password = passwordInput.value;
+          if (!client) return showAuthMessage("云端配置还没加载好，请刷新后再试。", "error");
+          if (!email) return emailInput.focus();
+          if (!password || password.length < 6) return passwordInput.focus();
+
+          passwordLogin.disabled = true;
+          passwordLogin.textContent = "登录中";
+          const { error } = await client.auth.signInWithPassword({ email, password });
+          passwordLogin.disabled = false;
+          passwordLogin.textContent = "密码登录";
+
+          if (error) {
+            const text = error.message === "Invalid login credentials" ? "登录失败：邮箱或密码不对。如果还没设置过密码，请先用验证码备用登录一次。" : `登录失败：${error.message}`;
+            showAuthMessage(text, "error");
+            return;
+          }
+          showAuthMessage("登录成功，正在同步云端数据。", "success");
+          window.setTimeout(() => window.location.reload(), 500);
+        }
+
+        async function updatePassword(event) {
+          event?.preventDefault();
+          const client = getClient();
+          const password = passwordInput.value;
+          if (!client) return showAuthMessage("云端配置还没加载好，请刷新后再试。", "error");
+          if (!password || password.length < 6) return passwordInput.focus();
+
+          savePassword.disabled = true;
+          savePassword.textContent = "保存中";
+          const { error } = await client.auth.updateUser({ password });
+          savePassword.disabled = false;
+          savePassword.textContent = "设置/更改密码";
+
+          if (error) return showAuthMessage(`密码设置失败：${error.message}`, "error");
+          passwordInput.value = "";
+          showAuthMessage("密码已设置好。以后可以直接用邮箱和密码登录。", "success");
+        }
+
         async function sendCode(event) {
           event.preventDefault();
           event.stopImmediatePropagation();
           const client = getClient();
-          const email = emailInput?.value.trim();
+          const email = emailInput.value.trim();
           if (!client) return showAuthMessage("云端配置还没加载好，请刷新后再试。", "error");
-          if (!email) return emailInput?.focus();
+          if (!email) return emailInput.focus();
 
           sendButton.disabled = true;
           sendButton.textContent = "发送中";
-          const { error } = await client.auth.signInWithOtp({
-            email,
-            options: { shouldCreateUser: true },
-          });
+          const { error } = await client.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
           sendButton.disabled = false;
-          sendButton.textContent = "发送验证码";
+          sendButton.textContent = "验证码备用";
 
           if (error) return showAuthMessage(`验证码发送失败：${error.message}`, "error");
-          codeInput?.classList.remove("is-hidden");
-          verifyButton?.classList.remove("is-hidden");
-          if (codeInput) {
-            codeInput.value = "";
-            codeInput.focus();
-          }
+          codeInput.classList.remove("is-hidden");
+          verifyButton.classList.remove("is-hidden");
+          codeInput.value = "";
+          codeInput.focus();
           showAuthMessage("验证码已发送，请输入邮件里的 8 位验证码。", "success");
         }
 
@@ -390,11 +460,11 @@
           event?.preventDefault();
           event?.stopImmediatePropagation();
           const client = getClient();
-          const email = emailInput?.value.trim();
-          const token = codeInput?.value.trim();
+          const email = emailInput.value.trim();
+          const token = codeInput.value.trim();
           if (!client) return showAuthMessage("云端配置还没加载好，请刷新后再试。", "error");
-          if (!email) return emailInput?.focus();
-          if (!token || token.length < 8) return codeInput?.focus();
+          if (!email) return emailInput.focus();
+          if (!token || token.length < 8) return codeInput.focus();
 
           verifyButton.disabled = true;
           verifyButton.textContent = "验证中";
@@ -407,11 +477,22 @@
           window.setTimeout(() => window.location.reload(), 500);
         }
 
-        sendButton?.addEventListener("click", sendCode, true);
-        verifyButton?.addEventListener("click", verifyCode, true);
-        codeInput?.addEventListener("keydown", (event) => {
+        passwordLogin.addEventListener("click", signInWithPassword);
+        savePassword.addEventListener("click", updatePassword);
+        sendButton.addEventListener("click", sendCode, true);
+        verifyButton.addEventListener("click", verifyCode, true);
+        passwordInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            savePassword.classList.contains("is-hidden") ? signInWithPassword(event) : updatePassword(event);
+          }
+        });
+        codeInput.addEventListener("keydown", (event) => {
           if (event.key === "Enter") verifyCode(event);
         });
+
+        refreshAuthUI();
+        getClient()?.auth.onAuthStateChange((_event, session) => applyAuthUI(session));
       });
     </script>
     <script>
