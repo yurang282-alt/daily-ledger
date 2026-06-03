@@ -1,9 +1,8 @@
-const CACHE_NAME = "daily-ledger-v18";
+const CACHE_NAME = "daily-ledger-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
-  "./auth-layout.css",
   "./app.js",
   "./config.js",
   "./manifest.json",
