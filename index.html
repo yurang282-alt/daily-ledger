@@ -326,8 +326,94 @@
     <button class="mobile-add-button" id="mobileAddRecord" type="button" aria-label="记一笔">＋</button>
     <div class="mobile-sheet-backdrop" id="mobileSheetBackdrop" aria-hidden="true"></div>
 
-    <script src="./config.js?v=20260602-stable"></script>
-    <script src="./app.js?v=20260602-stable"></script>
+    <script src="./config.js?v=20260603-otp"></script>
+    <script src="./app.js?v=20260603-otp"></script>
+    <script>
+      window.addEventListener("load", () => {
+        const emailInput = document.querySelector("#authEmail");
+        const codeInput = document.querySelector("#authCode");
+        const sendButton = document.querySelector("#sendLogin");
+        const verifyButton = document.querySelector("#verifyLogin");
+        const notice = document.querySelector("#syncNotice");
+        const message = document.querySelector("#syncMessage");
+
+        function showAuthMessage(text, kind) {
+          if (!notice || !message) return;
+          message.textContent = text;
+          notice.classList.remove("is-hidden", "is-success", "is-error");
+          notice.classList.toggle("is-success", kind === "success");
+          notice.classList.toggle("is-error", kind === "error");
+        }
+
+        function getClient() {
+          if (window.__dailyLedgerSupabaseClient) return window.__dailyLedgerSupabaseClient;
+          if (!window.supabase?.createClient || !window.APP_CONFIG?.supabaseUrl || !window.APP_CONFIG?.supabaseAnonKey) return null;
+          window.__dailyLedgerSupabaseClient = window.supabase.createClient(window.APP_CONFIG.supabaseUrl, window.APP_CONFIG.supabaseAnonKey, {
+            auth: {
+              persistSession: true,
+              autoRefreshToken: true,
+              detectSessionInUrl: true,
+              storageKey: "daily-ledger-supabase-auth",
+            },
+          });
+          return window.__dailyLedgerSupabaseClient;
+        }
+
+        async function sendCode(event) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          const client = getClient();
+          const email = emailInput?.value.trim();
+          if (!client) return showAuthMessage("云端配置还没加载好，请刷新后再试。", "error");
+          if (!email) return emailInput?.focus();
+
+          sendButton.disabled = true;
+          sendButton.textContent = "发送中";
+          const { error } = await client.auth.signInWithOtp({
+            email,
+            options: { shouldCreateUser: true },
+          });
+          sendButton.disabled = false;
+          sendButton.textContent = "发送验证码";
+
+          if (error) return showAuthMessage(`验证码发送失败：${error.message}`, "error");
+          codeInput?.classList.remove("is-hidden");
+          verifyButton?.classList.remove("is-hidden");
+          if (codeInput) {
+            codeInput.value = "";
+            codeInput.focus();
+          }
+          showAuthMessage("验证码已发送，请输入邮件里的 8 位验证码。", "success");
+        }
+
+        async function verifyCode(event) {
+          event?.preventDefault();
+          event?.stopImmediatePropagation();
+          const client = getClient();
+          const email = emailInput?.value.trim();
+          const token = codeInput?.value.trim();
+          if (!client) return showAuthMessage("云端配置还没加载好，请刷新后再试。", "error");
+          if (!email) return emailInput?.focus();
+          if (!token || token.length < 8) return codeInput?.focus();
+
+          verifyButton.disabled = true;
+          verifyButton.textContent = "验证中";
+          const { error } = await client.auth.verifyOtp({ email, token, type: "email" });
+          verifyButton.disabled = false;
+          verifyButton.textContent = "验证登录";
+
+          if (error) return showAuthMessage(`登录失败：${error.message}`, "error");
+          showAuthMessage("登录成功，正在同步云端数据。", "success");
+          window.setTimeout(() => window.location.reload(), 500);
+        }
+
+        sendButton?.addEventListener("click", sendCode, true);
+        verifyButton?.addEventListener("click", verifyCode, true);
+        codeInput?.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") verifyCode(event);
+        });
+      });
+    </script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
