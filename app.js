@@ -28,6 +28,8 @@ const state = {
   syncMessage: "",
   syncKind: "info",
   syncStatus: "local",
+  mobileView: "home",
+  chartView: "category",
 };
 
 const els = {
@@ -72,6 +74,9 @@ const els = {
   categoryLegend: document.querySelector("#categoryLegend"),
   dailyTrend: document.querySelector("#dailyTrend"),
   recordsList: document.querySelector("#recordsList"),
+  homeRecordCount: document.querySelector("#homeRecordCount"),
+  homeRecentList: document.querySelector("#homeRecentList"),
+  mobileAddRecord: document.querySelector("#mobileAddRecord"),
   exportData: document.querySelector("#exportData"),
   importData: document.querySelector("#importData"),
   importFile: document.querySelector("#importFile"),
@@ -97,6 +102,16 @@ function bindEvents() {
       document.querySelectorAll("[data-entry-type]").forEach((item) => item.classList.toggle("is-active", item === button));
       populateCategories();
     });
+  });
+
+  document.querySelectorAll("[data-mobile-view], [data-mobile-view-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      switchMobileView(button.dataset.mobileView || button.dataset.mobileViewTarget);
+    });
+  });
+
+  document.querySelectorAll("[data-chart-tab]").forEach((button) => {
+    button.addEventListener("click", () => setChartView(button.dataset.chartTab));
   });
 
   els.monthPicker.addEventListener("change", () => {
@@ -165,6 +180,10 @@ function bindEvents() {
   els.exportData.addEventListener("click", exportLedgerData);
   els.importData.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", importLedgerData);
+  els.mobileAddRecord?.addEventListener("click", () => {
+    switchMobileView("record");
+    window.setTimeout(() => els.amountInput.focus(), 80);
+  });
 }
 
 async function loadInitialData() {
@@ -356,8 +375,11 @@ function render() {
   renderCategoryChart();
   renderTrend();
   renderRecords();
+  renderHomeRecent();
   renderStatusPill();
   renderSyncNotice();
+  renderMobileView();
+  renderChartView();
 }
 
 function renderSyncNotice() {
@@ -582,52 +604,69 @@ function renderRecords() {
     return;
   }
 
-  els.recordsList.replaceChildren(
-    ...records.map((record) => {
-      const row = document.createElement("article");
-      row.className = "record-row";
+  els.recordsList.replaceChildren(...records.map((record) => createRecordRow(record)));
+}
 
-      const main = document.createElement("div");
-      main.className = "record-main";
+function renderHomeRecent() {
+  if (!els.homeRecentList || !els.homeRecordCount) return;
 
-      const title = document.createElement("div");
-      title.className = "record-title";
-      const category = document.createElement("span");
-      category.textContent = record.category;
-      const tag = document.createElement("span");
-      tag.className = `tag ${record.type}`;
-      tag.textContent = record.type === "expense" ? "支出" : "收入";
-      title.append(category, tag);
+  const records = getMonthRecords().sort((a, b) => b.date.localeCompare(a.date));
+  els.homeRecordCount.textContent = `${records.length} 笔`;
 
-      const note = document.createElement("div");
-      note.className = "record-note";
-      note.textContent = `${record.date}${record.note ? ` · ${record.note}` : ""}`;
-      main.append(title, note);
+  if (!records.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "这个月还没有记录。";
+    els.homeRecentList.replaceChildren(empty);
+    return;
+  }
 
-      const side = document.createElement("div");
-      side.className = `record-amount ${record.type}`;
-      const amount = document.createElement("span");
-      amount.textContent = `${record.type === "expense" ? "-" : "+"}${formatMoney(record.amount)}`;
-      const actions = document.createElement("div");
-      const editButton = document.createElement("button");
-      const deleteButton = document.createElement("button");
-      editButton.className = "delete-button";
-      editButton.type = "button";
-      editButton.textContent = "✎";
-      editButton.setAttribute("aria-label", "编辑记录");
-      editButton.addEventListener("click", () => editRecord(record.id));
-      deleteButton.className = "delete-button";
-      deleteButton.type = "button";
-      deleteButton.textContent = "×";
-      deleteButton.setAttribute("aria-label", "删除记录");
-      deleteButton.addEventListener("click", () => deleteRecord(record.id));
-      actions.append(editButton, deleteButton);
-      side.append(amount, actions);
+  els.homeRecentList.replaceChildren(...records.slice(0, 3).map((record) => createRecordRow(record, true)));
+}
 
-      row.append(main, side);
-      return row;
-    }),
-  );
+function createRecordRow(record, compact = false) {
+  const row = document.createElement("article");
+  row.className = `record-row${compact ? " is-compact" : ""}`;
+
+  const main = document.createElement("div");
+  main.className = "record-main";
+
+  const title = document.createElement("div");
+  title.className = "record-title";
+  const category = document.createElement("span");
+  category.textContent = record.category;
+  const tag = document.createElement("span");
+  tag.className = `tag ${record.type}`;
+  tag.textContent = record.type === "expense" ? "支出" : "收入";
+  title.append(category, tag);
+
+  const note = document.createElement("div");
+  note.className = "record-note";
+  note.textContent = `${record.date}${record.note ? ` · ${record.note}` : ""}`;
+  main.append(title, note);
+
+  const side = document.createElement("div");
+  side.className = `record-amount ${record.type}`;
+  const amount = document.createElement("span");
+  amount.textContent = `${record.type === "expense" ? "-" : "+"}${formatMoney(record.amount)}`;
+  const actions = document.createElement("div");
+  const editButton = document.createElement("button");
+  const deleteButton = document.createElement("button");
+  editButton.className = "delete-button";
+  editButton.type = "button";
+  editButton.textContent = "✎";
+  editButton.setAttribute("aria-label", "编辑记录");
+  editButton.addEventListener("click", () => editRecord(record.id));
+  deleteButton.className = "delete-button";
+  deleteButton.type = "button";
+  deleteButton.textContent = "×";
+  deleteButton.setAttribute("aria-label", "删除记录");
+  deleteButton.addEventListener("click", () => deleteRecord(record.id));
+  actions.append(editButton, deleteButton);
+  side.append(amount, actions);
+
+  row.append(main, side);
+  return row;
 }
 
 function editRecord(id) {
@@ -644,7 +683,40 @@ function editRecord(id) {
   els.dateInput.value = record.date;
   els.noteInput.value = record.note || "";
   els.saveButton.textContent = "更新";
+  switchMobileView("record");
   els.amountInput.focus();
+}
+
+function switchMobileView(view) {
+  if (!["home", "record", "stats"].includes(view)) return;
+  state.mobileView = view;
+  renderMobileView();
+  if (window.matchMedia("(max-width: 680px)").matches) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+function renderMobileView() {
+  document.body.classList.toggle("mobile-view-home", state.mobileView === "home");
+  document.body.classList.toggle("mobile-view-record", state.mobileView === "record");
+  document.body.classList.toggle("mobile-view-stats", state.mobileView === "stats");
+  document.querySelectorAll("[data-mobile-view]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.mobileView === state.mobileView);
+  });
+}
+
+function setChartView(view) {
+  if (!["category", "trend"].includes(view)) return;
+  state.chartView = view;
+  renderChartView();
+}
+
+function renderChartView() {
+  document.body.classList.toggle("mobile-chart-category", state.chartView === "category");
+  document.body.classList.toggle("mobile-chart-trend", state.chartView === "trend");
+  document.querySelectorAll("[data-chart-tab]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.chartTab === state.chartView);
+  });
 }
 
 async function deleteRecord(id) {

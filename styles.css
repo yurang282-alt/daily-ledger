@@ -276,6 +276,7 @@ select:focus {
 }
 
 .metric,
+.home-recent-panel,
 .entry-panel,
 .analysis-panel,
 .list-panel,
@@ -289,6 +290,11 @@ select:focus {
 .metric {
   min-height: 116px;
   padding: 18px;
+}
+
+.home-recent-panel,
+.mobile-tabbar {
+  display: none;
 }
 
 .metric span,
@@ -648,6 +654,15 @@ label {
   color: var(--blue);
 }
 
+.mobile-add-button {
+  display: none;
+  border: 0;
+  background: var(--green);
+  color: #fff;
+  font-size: 34px;
+  font-weight: 700;
+}
+
 dialog {
   width: min(390px, calc(100% - 32px));
   border: 0;
@@ -753,6 +768,18 @@ dialog::backdrop {
 
   .donut {
     justify-self: center;
+  }
+
+  .legend {
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .legend .empty-state {
+    display: block;
+    width: 100%;
+    text-align: center;
   }
 
   .record-row {
