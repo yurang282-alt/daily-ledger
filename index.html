@@ -19,7 +19,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow" id="modeLabel">本地记账</p>
-          <h1>每日收支</h1>
+          <h1 id="pageTitle">每日收支</h1>
         </div>
         <div class="top-actions">
           <button class="status-pill" id="cloudStatus" type="button">本地模式 · 未登录</button>
@@ -52,8 +52,19 @@
 
       <section class="summary-grid" aria-label="月度概览">
         <article class="metric spending-metric">
-          <span>本月已花</span>
+          <div class="spending-heading">
+            <span>本月已花</span>
+            <strong id="budgetRate">0%</strong>
+          </div>
           <strong id="expenseTotal">¥0.00</strong>
+          <div class="spending-budget-line">
+            <span id="spendingBudgetLabel">预算未设置</span>
+            <button class="spending-budget-button" id="editBudgetQuick" type="button">设置预算</button>
+          </div>
+          <div class="spending-progress-track" aria-label="预算使用比例">
+            <span id="spendingBudgetProgress"></span>
+          </div>
+          <small id="spendingBudgetHint">设置预算后会在 80% 时提醒</small>
         </article>
         <article class="metric budget-metric">
           <div class="metric-heading">
@@ -95,6 +106,10 @@
               </button>
             </div>
           </label>
+          <button class="voice-row" id="voiceInputRow" type="button">
+            <span>语音输入</span>
+            <small>说出金额和分类，快速记账</small>
+          </button>
 
           <div class="field-row">
             <label>

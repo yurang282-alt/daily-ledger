@@ -35,6 +35,7 @@ const state = {
 
 const els = {
   modeLabel: document.querySelector("#modeLabel"),
+  pageTitle: document.querySelector("#pageTitle"),
   cloudStatus: document.querySelector("#cloudStatus"),
   authPanel: document.querySelector("#authPanel"),
   authEmail: document.querySelector("#authEmail"),
@@ -52,7 +53,12 @@ const els = {
   budgetValue: document.querySelector("#budgetValue"),
   budgetProgress: document.querySelector("#budgetProgress"),
   budgetMeta: document.querySelector("#budgetMeta"),
+  budgetRate: document.querySelector("#budgetRate"),
+  spendingBudgetLabel: document.querySelector("#spendingBudgetLabel"),
+  spendingBudgetProgress: document.querySelector("#spendingBudgetProgress"),
+  spendingBudgetHint: document.querySelector("#spendingBudgetHint"),
   editBudget: document.querySelector("#editBudget"),
+  editBudgetQuick: document.querySelector("#editBudgetQuick"),
   budgetDialog: document.querySelector("#budgetDialog"),
   budgetForm: document.querySelector("#budgetForm"),
   budgetInput: document.querySelector("#budgetInput"),
@@ -68,6 +74,7 @@ const els = {
   dateInput: document.querySelector("#dateInput"),
   noteInput: document.querySelector("#noteInput"),
   voiceInput: document.querySelector("#voiceInput"),
+  voiceInputRow: document.querySelector("#voiceInputRow"),
   voiceLabel: document.querySelector("#voiceLabel"),
   saveButton: document.querySelector("#entryForm .primary-button"),
   recordCount: document.querySelector("#recordCount"),
@@ -152,12 +159,14 @@ function bindEvents() {
     }
   });
 
-  els.editBudget.addEventListener("click", () => {
+  const openBudgetDialog = () => {
     els.budgetInput.value = state.budget ? state.budget : "";
     if (typeof els.budgetDialog.showModal === "function") {
       els.budgetDialog.showModal();
     }
-  });
+  };
+  els.editBudget.addEventListener("click", openBudgetDialog);
+  els.editBudgetQuick?.addEventListener("click", openBudgetDialog);
 
   els.closeBudget.addEventListener("click", () => els.budgetDialog.close());
 
@@ -191,6 +200,7 @@ function bindEvents() {
   els.importData.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", importLedgerData);
   els.voiceInput?.addEventListener("click", handleVoiceInput);
+  els.voiceInputRow?.addEventListener("click", handleVoiceInput);
   els.mobileAddRecord?.addEventListener("click", () => {
     switchMobileView("record");
     window.setTimeout(() => els.amountInput.focus(), 80);
@@ -492,7 +502,7 @@ function populateCategories(selected = els.categorySelect.value) {
 function renderQuickCategories(list) {
   if (!els.quickCategoryList) return;
 
-  const quickCategories = list.slice(0, 6);
+  const quickCategories = list.slice(0, 8);
   els.quickCategoryList.replaceChildren(
     ...quickCategories.map((category) => {
       const button = document.createElement("button");
@@ -520,16 +530,26 @@ function renderSummary() {
   els.budgetProgress.style.width = `${Math.min(usedRate, 100)}%`;
   els.budgetProgress.classList.toggle("is-warning", budget > 0 && expense >= budget * 0.8 && expense < budget);
   els.budgetProgress.classList.toggle("is-over", budget > 0 && expense >= budget);
+  els.spendingBudgetProgress.style.width = `${Math.min(usedRate, 100)}%`;
+  els.spendingBudgetProgress.classList.toggle("is-warning", budget > 0 && expense >= budget * 0.8 && expense < budget);
+  els.spendingBudgetProgress.classList.toggle("is-over", budget > 0 && expense >= budget);
 
   if (!budget) {
     els.budgetMeta.textContent = "设置后将在 80% 时提醒";
+    els.budgetRate.textContent = "0%";
+    els.spendingBudgetLabel.textContent = "预算未设置";
+    els.spendingBudgetHint.textContent = "设置预算后会在 80% 时提醒";
     els.budgetNotice.classList.add("is-hidden");
     els.budgetNotice.classList.remove("is-over");
     return;
   }
 
   const remaining = Math.max(budget - expense, 0);
-  els.budgetMeta.textContent = `已使用 ${Math.round((expense / budget) * 100)}%，剩余 ${formatMoney(remaining)}`;
+  const rate = Math.round((expense / budget) * 100);
+  els.budgetMeta.textContent = `已使用 ${rate}%，剩余 ${formatMoney(remaining)}`;
+  els.budgetRate.textContent = `${rate}%`;
+  els.spendingBudgetLabel.textContent = `预算 ${formatMoney(budget)}`;
+  els.spendingBudgetHint.textContent = `剩余 ${formatMoney(remaining)}`;
 
   if (expense >= budget) {
     els.budgetNotice.textContent = `本月支出已超过上限：已用 ${formatMoney(expense)}，上限 ${formatMoney(budget)}。`;
@@ -812,6 +832,14 @@ function renderMobileView() {
   document.body.classList.toggle("mobile-view-home", state.mobileView === "home");
   document.body.classList.toggle("mobile-view-record", state.mobileView === "record");
   document.body.classList.toggle("mobile-view-stats", state.mobileView === "stats");
+  const titles = {
+    home: "每日收支",
+    record: "记一笔",
+    stats: "统计",
+  };
+  if (els.pageTitle) {
+    els.pageTitle.textContent = titles[state.mobileView] || "每日收支";
+  }
   document.querySelectorAll("[data-mobile-view]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.mobileView === state.mobileView);
   });
