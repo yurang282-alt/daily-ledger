@@ -14,6 +14,7 @@ const localStore = createLocalStore();
 let cloudStore = null;
 let supabaseClient = null;
 let noticeTimer = null;
+let speechRecognition = null;
 
 const state = {
   records: [],
@@ -47,9 +48,7 @@ const els = {
   prevMonth: document.querySelector("#prevMonth"),
   nextMonth: document.querySelector("#nextMonth"),
   budgetNotice: document.querySelector("#budgetNotice"),
-  incomeTotal: document.querySelector("#incomeTotal"),
   expenseTotal: document.querySelector("#expenseTotal"),
-  balanceTotal: document.querySelector("#balanceTotal"),
   budgetValue: document.querySelector("#budgetValue"),
   budgetProgress: document.querySelector("#budgetProgress"),
   budgetMeta: document.querySelector("#budgetMeta"),
@@ -61,18 +60,23 @@ const els = {
   entryForm: document.querySelector("#entryForm"),
   amountInput: document.querySelector("#amountInput"),
   categorySelect: document.querySelector("#categorySelect"),
+  quickCategoryList: document.querySelector("#quickCategoryList"),
   showCategoryForm: document.querySelector("#showCategoryForm"),
   categoryForm: document.querySelector("#categoryForm"),
   categoryNameInput: document.querySelector("#categoryNameInput"),
   addCategory: document.querySelector("#addCategory"),
   dateInput: document.querySelector("#dateInput"),
   noteInput: document.querySelector("#noteInput"),
+  voiceInput: document.querySelector("#voiceInput"),
+  voiceLabel: document.querySelector("#voiceLabel"),
   saveButton: document.querySelector("#entryForm .primary-button"),
   recordCount: document.querySelector("#recordCount"),
   categoryHint: document.querySelector("#categoryHint"),
   categoryDonut: document.querySelector("#categoryDonut"),
   categoryLegend: document.querySelector("#categoryLegend"),
   dailyTrend: document.querySelector("#dailyTrend"),
+  topCategoryInsight: document.querySelector("#topCategoryInsight"),
+  avgDailyInsight: document.querySelector("#avgDailyInsight"),
   recordsList: document.querySelector("#recordsList"),
   homeRecordCount: document.querySelector("#homeRecordCount"),
   homeRecentList: document.querySelector("#homeRecentList"),
@@ -114,6 +118,11 @@ function bindEvents() {
     button.addEventListener("click", () => setChartView(button.dataset.chartTab));
   });
 
+  els.cloudStatus.addEventListener("click", () => {
+    document.body.classList.toggle("auth-open");
+  });
+  els.authPanel.addEventListener("submit", (event) => event.preventDefault());
+
   els.monthPicker.addEventListener("change", () => {
     state.selectedMonth = els.monthPicker.value || toMonthValue(new Date());
     render();
@@ -135,6 +144,7 @@ function bindEvents() {
   });
 
   els.addCategory.addEventListener("click", addCategory);
+  els.categorySelect.addEventListener("change", () => renderQuickCategories(state.categories[state.currentType] || []));
   els.categoryNameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -180,6 +190,7 @@ function bindEvents() {
   els.exportData.addEventListener("click", exportLedgerData);
   els.importData.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", importLedgerData);
+  els.voiceInput?.addEventListener("click", handleVoiceInput);
   els.mobileAddRecord?.addEventListener("click", () => {
     switchMobileView("record");
     window.setTimeout(() => els.amountInput.focus(), 80);
@@ -374,6 +385,7 @@ function render() {
   renderSummary();
   renderCategoryChart();
   renderTrend();
+  renderInsights();
   renderRecords();
   renderHomeRecent();
   renderStatusPill();
@@ -474,19 +486,36 @@ function populateCategories(selected = els.categorySelect.value) {
   if (list.includes(selected)) {
     els.categorySelect.value = selected;
   }
+  renderQuickCategories(list);
+}
+
+function renderQuickCategories(list) {
+  if (!els.quickCategoryList) return;
+
+  const quickCategories = list.slice(0, 6);
+  els.quickCategoryList.replaceChildren(
+    ...quickCategories.map((category) => {
+      const button = document.createElement("button");
+      button.className = "quick-category";
+      button.type = "button";
+      button.textContent = category;
+      button.classList.toggle("is-active", els.categorySelect.value === category);
+      button.addEventListener("click", () => {
+        els.categorySelect.value = category;
+        renderQuickCategories(list);
+      });
+      return button;
+    }),
+  );
 }
 
 function renderSummary() {
   const records = getMonthRecords();
-  const income = sumByType(records, "income");
   const expense = sumByType(records, "expense");
-  const balance = income - expense;
   const budget = state.budget;
   const usedRate = budget > 0 ? Math.min((expense / budget) * 100, 120) : 0;
 
-  els.incomeTotal.textContent = formatMoney(income);
   els.expenseTotal.textContent = formatMoney(expense);
-  els.balanceTotal.textContent = formatMoney(balance);
   els.budgetValue.textContent = budget > 0 ? formatMoney(budget) : "未设置";
   els.budgetProgress.style.width = `${Math.min(usedRate, 100)}%`;
   els.budgetProgress.classList.toggle("is-warning", budget > 0 && expense >= budget * 0.8 && expense < budget);
@@ -590,6 +619,89 @@ function renderTrend() {
       return bar;
     }),
   );
+}
+
+function renderInsights() {
+  if (!els.topCategoryInsight || !els.avgDailyInsight) return;
+
+  const expenseRecords = getMonthRecords().filter((record) => record.type === "expense");
+  const total = sumByType(expenseRecords, "expense");
+  const totals = new Map();
+
+  expenseRecords.forEach((record) => {
+    totals.set(record.category, (totals.get(record.category) || 0) + record.amount);
+  });
+
+  const top = [...totals.entries()].sort((a, b) => b[1] - a[1])[0];
+  els.topCategoryInsight.textContent = top ? `${top[0]} · ${formatMoney(top[1])}` : "暂无";
+
+  const [year, month] = state.selectedMonth.split("-").map(Number);
+  const now = new Date();
+  const isCurrentMonth = state.selectedMonth === toMonthValue(now);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const divisor = isCurrentMonth ? Math.max(1, now.getDate()) : daysInMonth;
+  els.avgDailyInsight.textContent = formatMoney(total / divisor);
+}
+
+function handleVoiceInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showNotice("当前浏览器不支持语音录入，可以先手动记一笔。", "error", 3500);
+    return;
+  }
+
+  if (speechRecognition) {
+    speechRecognition.stop();
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  speechRecognition = recognition;
+  recognition.lang = "zh-CN";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    els.voiceInput?.classList.add("is-listening");
+    if (els.voiceLabel) els.voiceLabel.textContent = "听取中";
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+    if (transcript) applyVoiceText(transcript);
+  };
+
+  recognition.onerror = () => {
+    showNotice("语音录入失败，可以再试一次或手动输入。", "error", 3500);
+  };
+
+  recognition.onend = () => {
+    speechRecognition = null;
+    els.voiceInput?.classList.remove("is-listening");
+    if (els.voiceLabel) els.voiceLabel.textContent = "语音";
+  };
+
+  recognition.start();
+}
+
+function applyVoiceText(text) {
+  const amountMatch = text.match(/(\d+(?:\.\d+)?)/);
+  const categories = state.categories[state.currentType] || [];
+  const matchedCategory = categories.find((category) => text.includes(category));
+
+  if (amountMatch) {
+    els.amountInput.value = amountMatch[1];
+  }
+  if (matchedCategory) {
+    els.categorySelect.value = matchedCategory;
+    renderQuickCategories(categories);
+  }
+  if (!els.noteInput.value.trim()) {
+    els.noteInput.value = text;
+  }
+
+  const filled = [amountMatch ? "金额" : "", matchedCategory ? "分类" : ""].filter(Boolean).join("、");
+  showNotice(filled ? `已从语音识别出${filled}。` : "已把语音内容放入备注。", "success", 3000);
 }
 
 function renderRecords() {

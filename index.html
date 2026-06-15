@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#20785a" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="每日收支" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -11,377 +12,7 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260615-direct" />
-    <style>
-      @media (max-width: 680px) {
-        * {
-          max-width: 100% !important;
-          box-sizing: border-box !important;
-        }
-
-        html,
-        body {
-          height: auto !important;
-          min-height: 0 !important;
-          overflow-x: hidden !important;
-          overflow-y: auto !important;
-        }
-
-        body {
-          padding-bottom: 0 !important;
-        }
-
-        .app-shell {
-          display: block !important;
-          width: 100% !important;
-          max-width: 480px !important;
-          margin: 0 auto !important;
-          padding: max(14px, env(safe-area-inset-top)) 12px calc(32px + env(safe-area-inset-bottom)) !important;
-        }
-
-        .topbar,
-        .top-actions,
-        .auth-panel,
-        .summary-grid,
-        .workspace,
-        .charts-grid,
-        .donut-wrap {
-          display: block !important;
-          width: 100% !important;
-        }
-
-        .topbar,
-        .summary-grid,
-        .workspace,
-        .analysis-panel,
-        .list-panel {
-          margin-bottom: 12px !important;
-        }
-
-        .app-shell,
-        .topbar,
-        .top-actions,
-        .auth-panel,
-        .month-switcher,
-        .summary-grid,
-        .workspace,
-        .entry-panel,
-        .analysis-panel,
-        .list-panel,
-        .metric,
-        .field-row,
-        .field-row label {
-          min-width: 0 !important;
-          max-width: 100% !important;
-        }
-
-        .top-actions,
-        .auth-panel {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: 10px !important;
-        }
-
-        .month-switcher {
-          display: grid !important;
-          grid-template-columns: 42px minmax(0, 1fr) 42px !important;
-          gap: 8px !important;
-          margin-top: 10px !important;
-          width: 100% !important;
-        }
-
-        .summary-grid {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: 10px !important;
-        }
-
-        .entry-panel {
-          position: static !important;
-          inset: auto !important;
-          display: flex !important;
-          flex-direction: column !important;
-          gap: 12px !important;
-          width: 100% !important;
-          height: auto !important;
-          min-height: 0 !important;
-          max-height: none !important;
-          overflow: visible !important;
-          margin: 0 0 12px !important;
-          padding: 14px !important;
-          transform: none !important;
-        }
-
-        .entry-panel .panel-title,
-        .entry-panel label,
-        .field-row,
-        .inline-form {
-          display: block !important;
-          width: 100% !important;
-          height: auto !important;
-          min-height: 0 !important;
-          max-height: none !important;
-          margin: 0 !important;
-          overflow: visible !important;
-        }
-
-        .field-row {
-          display: grid !important;
-          grid-template-columns: minmax(0, 1fr) !important;
-          gap: 10px !important;
-          align-items: end !important;
-        }
-
-        .entry-panel input,
-        .entry-panel select,
-        .entry-panel button,
-        .auth-panel input,
-        .auth-panel button {
-          width: 100% !important;
-          min-inline-size: 0 !important;
-          min-width: 0 !important;
-          max-width: 100% !important;
-        }
-
-        .secondary-button {
-          white-space: normal !important;
-        }
-
-        .entry-panel input,
-        .entry-panel select {
-          display: block !important;
-          height: 44px !important;
-          min-height: 44px !important;
-          max-height: 44px !important;
-          margin-top: 7px !important;
-        }
-
-        #amountInput {
-          height: 56px !important;
-          min-height: 56px !important;
-          max-height: 56px !important;
-        }
-
-        .entry-panel .primary-button {
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          height: 46px !important;
-          min-height: 46px !important;
-          margin-top: 0 !important;
-        }
-
-        .analysis-panel,
-        .list-panel,
-        .metric {
-          padding: 14px !important;
-        }
-
-        .mobile-chart-tabs {
-          display: grid !important;
-          grid-template-columns: 1fr 1fr !important;
-          gap: 0 !important;
-          margin-bottom: 12px !important;
-        }
-
-        .chart-block {
-          min-height: 0 !important;
-        }
-
-        .mobile-add-button,
-        .mobile-sheet-backdrop {
-          display: none !important;
-          width: 0 !important;
-          height: 0 !important;
-          min-height: 0 !important;
-          opacity: 0 !important;
-          pointer-events: none !important;
-        }
-      }
-    </style>
-    <style>
-      @media (max-width: 680px) {
-        body.mobile-view-home .workspace,
-        body.mobile-view-home .list-panel,
-        body.mobile-view-record .summary-grid,
-        body.mobile-view-record .home-recent-panel,
-        body.mobile-view-record .analysis-panel,
-        body.mobile-view-stats .summary-grid,
-        body.mobile-view-stats .home-recent-panel,
-        body.mobile-view-stats .entry-panel,
-        body.mobile-view-stats .list-panel {
-          display: none !important;
-        }
-
-        body.mobile-view-record .workspace,
-        body.mobile-view-stats .workspace,
-        body.mobile-view-stats .analysis-panel {
-          display: block !important;
-        }
-
-        .app-shell {
-          padding-bottom: calc(108px + env(safe-area-inset-bottom)) !important;
-        }
-
-        .topbar {
-          gap: 12px !important;
-        }
-
-        .topbar h1 {
-          max-width: 180px !important;
-          font-size: 34px !important;
-          line-height: 0.98 !important;
-        }
-
-        .top-actions {
-          gap: 8px !important;
-        }
-
-        .auth-panel {
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-          padding: 6px !important;
-          border-radius: 8px !important;
-        }
-
-        .auth-panel input,
-        .auth-panel button {
-          height: 40px !important;
-          min-height: 40px !important;
-        }
-
-        .month-switcher {
-          margin-top: 4px !important;
-        }
-
-        .summary-grid {
-          gap: 12px !important;
-        }
-
-        .spending-metric {
-          min-height: 150px !important;
-          display: grid !important;
-          align-content: center !important;
-        }
-
-        .spending-metric strong {
-          font-size: 42px !important;
-          line-height: 1 !important;
-        }
-
-        .home-recent-panel,
-        .entry-panel,
-        .analysis-panel,
-        .list-panel,
-        .metric {
-          border-radius: 8px !important;
-          box-shadow: 0 12px 34px rgba(24, 33, 29, 0.07) !important;
-        }
-
-        .home-recent-panel {
-          display: block !important;
-          width: 100% !important;
-          margin-bottom: 12px !important;
-          padding: 14px !important;
-        }
-
-        .home-recent-actions {
-          display: flex !important;
-          justify-content: flex-end !important;
-          align-items: center !important;
-          gap: 12px !important;
-          margin-top: 12px !important;
-        }
-
-        .home-recent-actions .primary-button {
-          width: auto !important;
-          min-width: 128px !important;
-        }
-
-        .records--compact {
-          gap: 0 !important;
-        }
-
-        .record-row.is-compact {
-          padding: 10px 0 !important;
-        }
-
-        .record-row.is-compact .record-amount > div {
-          display: none !important;
-        }
-
-        .mobile-chart-tabs {
-          display: grid !important;
-        }
-
-        body.mobile-chart-category [data-chart-panel="trend"],
-        body.mobile-chart-trend [data-chart-panel="category"] {
-          display: none !important;
-        }
-
-        .mobile-add-button {
-          position: fixed !important;
-          right: 18px !important;
-          bottom: calc(98px + env(safe-area-inset-bottom)) !important;
-          z-index: 20 !important;
-          display: grid !important;
-          place-items: center !important;
-          width: 58px !important;
-          height: 58px !important;
-          min-height: 58px !important;
-          border-radius: 18px !important;
-          opacity: 1 !important;
-          pointer-events: auto !important;
-          box-shadow: 0 16px 36px rgba(32, 120, 90, 0.28) !important;
-        }
-
-        body.mobile-view-record .mobile-add-button {
-          display: none !important;
-        }
-
-        .mobile-tabbar {
-          position: fixed !important;
-          right: 12px !important;
-          bottom: max(10px, env(safe-area-inset-bottom)) !important;
-          left: 12px !important;
-          z-index: 19 !important;
-          display: grid !important;
-          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-          gap: 4px !important;
-          max-width: 456px !important;
-          margin: 0 auto !important;
-          padding: 7px !important;
-          border: 1px solid rgba(223, 230, 225, 0.95) !important;
-          border-radius: 8px !important;
-          background: rgba(255, 255, 255, 0.94) !important;
-          box-shadow: 0 16px 40px rgba(24, 33, 29, 0.16) !important;
-          backdrop-filter: blur(18px) !important;
-        }
-
-        .mobile-tabbar button {
-          display: grid !important;
-          place-items: center !important;
-          gap: 3px !important;
-          min-height: 52px !important;
-          border: 0 !important;
-          border-radius: 7px !important;
-          background: transparent !important;
-          color: var(--muted) !important;
-          font-size: 12px !important;
-          font-weight: 800 !important;
-        }
-
-        .mobile-tabbar svg {
-          width: 20px !important;
-          height: 20px !important;
-          stroke-width: 2.2 !important;
-        }
-
-        .mobile-tabbar button.is-active {
-          background: var(--green-soft) !important;
-          color: var(--green) !important;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="./styles.css?v=20260615-redesign" />
   </head>
   <body class="mobile-view-home mobile-chart-category">
     <main class="app-shell">
@@ -391,8 +22,8 @@
           <h1>每日收支</h1>
         </div>
         <div class="top-actions">
-          <span class="status-pill" id="cloudStatus">本地模式 · 未登录</span>
-          <div class="auth-panel" id="authPanel">
+          <button class="status-pill" id="cloudStatus" type="button">本地模式 · 未登录</button>
+          <form class="auth-panel" id="authPanel">
             <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email" />
             <input id="authPassword" type="password" minlength="6" placeholder="密码" autocomplete="current-password" />
             <button class="secondary-button" id="passwordLogin" type="button">密码登录</button>
@@ -401,7 +32,7 @@
             <button class="secondary-button is-hidden" id="verifyLogin" type="button">验证登录</button>
             <button class="secondary-button is-hidden" id="savePassword" type="button">设置/更改密码</button>
             <button class="plain-button is-hidden" id="signOut" type="button">退出</button>
-          </div>
+          </form>
           <div class="month-switcher" aria-label="选择统计月份">
             <button class="icon-button" id="prevMonth" type="button" aria-label="上个月">‹</button>
             <input id="monthPicker" type="month" />
@@ -421,12 +52,12 @@
 
       <section class="summary-grid" aria-label="月度概览">
         <article class="metric spending-metric">
-          <span>本月支出</span>
+          <span>本月已花</span>
           <strong id="expenseTotal">¥0.00</strong>
         </article>
         <article class="metric budget-metric">
           <div class="metric-heading">
-            <span>月支出上限</span>
+            <span>预算上限</span>
             <button class="plain-button" id="editBudget" type="button">设置</button>
           </div>
           <strong id="budgetValue">未设置</strong>
@@ -451,9 +82,18 @@
             <h2>记一笔</h2>
           </div>
 
-          <label>
+          <label class="amount-field">
             金额
-            <input id="amountInput" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" required />
+            <div class="amount-control">
+              <input id="amountInput" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" required />
+              <button class="voice-button" id="voiceInput" type="button" aria-label="语音录入">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 4a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V7a3 3 0 0 1 3-3Z" stroke="currentColor" stroke-width="2" />
+                  <path d="M6 11a6 6 0 0 0 12 0M12 17v3M9 20h6" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+                </svg>
+                <span id="voiceLabel">语音</span>
+              </button>
+            </div>
           </label>
 
           <div class="field-row">
@@ -463,6 +103,7 @@
             </label>
             <button class="secondary-button" id="showCategoryForm" type="button">新增分类</button>
           </div>
+          <div class="quick-category-list" id="quickCategoryList" aria-label="快捷分类"></div>
 
           <div class="inline-form is-hidden" id="categoryForm">
             <input id="categoryNameInput" type="text" maxlength="12" placeholder="分类名称" />
@@ -511,6 +152,16 @@
                 <span id="trendHint">本月支出</span>
               </div>
               <div class="bar-chart" id="dailyTrend" aria-label="每日支出趋势"></div>
+            </article>
+          </div>
+          <div class="insight-grid" aria-label="统计摘要">
+            <article>
+              <span>最大分类</span>
+              <strong id="topCategoryInsight">暂无</strong>
+            </article>
+            <article>
+              <span>日均支出</span>
+              <strong id="avgDailyInsight">¥0.00</strong>
             </article>
           </div>
         </section>
@@ -567,8 +218,8 @@
       </button>
     </nav>
 
-    <script src="./config.js?v=20260615-direct"></script>
-    <script src="./app.js?v=20260615-direct"></script>
+    <script src="./config.js?v=20260615-redesign"></script>
+    <script src="./app.js?v=20260615-redesign"></script>
     <script>
       window.addEventListener("load", () => {
         if (window.__dailyLedgerPasswordAuthReady) return;
