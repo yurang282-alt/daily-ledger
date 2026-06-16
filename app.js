@@ -1,6 +1,8 @@
 const STORAGE_KEY = "daily-ledger-records-v1";
 const CATEGORY_KEY = "daily-ledger-categories-v1";
 const BUDGET_KEY = "daily-ledger-budget-v1";
+const AUTH_STORAGE_KEY = "daily-ledger-supabase-auth";
+const LEDGER_EXPORT_SCHEMA_VERSION = 1;
 const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 
 const DEFAULT_CATEGORIES = {
@@ -26,6 +28,7 @@ const state = {
   mode: "local",
   user: null,
   pendingMigration: false,
+  pendingOtp: false,
   syncMessage: "",
   syncKind: "info",
   syncStatus: "local",
@@ -39,7 +42,12 @@ const els = {
   cloudStatus: document.querySelector("#cloudStatus"),
   authPanel: document.querySelector("#authPanel"),
   authEmail: document.querySelector("#authEmail"),
+  authPassword: document.querySelector("#authPassword"),
+  passwordLogin: document.querySelector("#passwordLogin"),
   sendLogin: document.querySelector("#sendLogin"),
+  authCode: document.querySelector("#authCode"),
+  verifyLogin: document.querySelector("#verifyLogin"),
+  savePassword: document.querySelector("#savePassword"),
   signOut: document.querySelector("#signOut"),
   syncNotice: document.querySelector("#syncNotice"),
   syncMessage: document.querySelector("#syncMessage"),
@@ -172,23 +180,40 @@ function bindEvents() {
 
   els.budgetForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const snapshot = captureAppSnapshot();
     state.budget = Math.max(0, Number(els.budgetInput.value || 0));
     els.budgetDialog.close();
     render();
-    await commitStoreChange(() => activeStore().saveBudget(state.budget), "预算已保存");
+    const saved = await commitStoreChange(() => activeStore().saveBudget(state.budget), "预算已保存");
+    if (!saved) restoreAppSnapshot(snapshot);
   });
 
   els.clearMonth.addEventListener("click", async () => {
     const monthRecords = getMonthRecords();
     if (!monthRecords.length) return;
     if (!confirm(`确定清空 ${state.selectedMonth} 的 ${monthRecords.length} 笔记录吗？`)) return;
+    const snapshot = captureAppSnapshot();
     const month = state.selectedMonth;
     state.records = state.records.filter((record) => !record.date.startsWith(month));
     render();
-    await commitStoreChange(() => activeStore().clearMonth(month), "本月记录已清空");
+    const saved = await commitStoreChange(() => activeStore().clearMonth(month), "本月记录已清空");
+    if (!saved) restoreAppSnapshot(snapshot);
   });
 
-  els.sendLogin.addEventListener("click", sendLoginLink);
+  els.passwordLogin?.addEventListener("click", signInWithPassword);
+  els.sendLogin.addEventListener("click", sendLoginCode);
+  els.verifyLogin?.addEventListener("click", verifyLoginCode);
+  els.savePassword?.addEventListener("click", updatePassword);
+  els.authPassword?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    state.user ? updatePassword() : signInWithPassword();
+  });
+  els.authCode?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    verifyLoginCode();
+  });
   els.signOut.addEventListener("click", signOut);
   els.migrateData.addEventListener("click", migrateLocalData);
   els.dismissMigration.addEventListener("click", () => {
@@ -225,7 +250,8 @@ async function setupCloudStore() {
 
   try {
     await loadSupabaseSdk();
-    supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+    supabaseClient = createSupabaseClient(config);
+    await exchangeRedirectCode(supabaseClient);
     const { data } = await supabaseClient.auth.getSession();
     state.user = data.session?.user || null;
     cloudStore = createCloudStore(supabaseClient);
@@ -241,6 +267,7 @@ async function setupCloudStore() {
       state.mode = state.user ? "cloud" : "local";
       state.syncMessage = "";
       if (state.user) {
+        state.pendingOtp = false;
         setSyncStatus("saving", "正在读取云端");
         state.pendingMigration = hasLocalData();
         await safeReloadCloudData();
@@ -248,6 +275,7 @@ async function setupCloudStore() {
           showNotice("登录成功，云端数据已同步。", "success", 3000);
         }
       } else {
+        state.pendingOtp = false;
         state.syncStatus = "local";
         applyLedgerData(localStore.readAll());
         if (event === "SIGNED_OUT") {
@@ -288,7 +316,42 @@ async function safeReloadCloudData() {
   }
 }
 
-async function sendLoginLink() {
+async function signInWithPassword() {
+  if (!supabaseClient) {
+    alert("请先在 config.js 填入 Supabase 项目配置。");
+    return;
+  }
+
+  const email = els.authEmail.value.trim();
+  const password = els.authPassword?.value || "";
+  if (!email) {
+    els.authEmail.focus();
+    return;
+  }
+  if (!password || password.length < 6) {
+    els.authPassword?.focus();
+    return;
+  }
+
+  els.passwordLogin.disabled = true;
+  els.passwordLogin.textContent = "登录中";
+
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+  els.passwordLogin.disabled = false;
+  els.passwordLogin.textContent = "密码登录";
+
+  if (error) {
+    const message = error.message === "Invalid login credentials" ? "登录失败：邮箱或密码不对。如果还没设置过密码，请先用验证码备用登录一次。" : `登录失败：${error.message}`;
+    showNotice(message, "error");
+    return;
+  }
+
+  state.pendingOtp = false;
+  showNotice("登录成功，正在同步云端数据。", "success", 3000);
+}
+
+async function sendLoginCode() {
   if (!supabaseClient) {
     alert("请先在 config.js 填入 Supabase 项目配置。");
     return;
@@ -305,18 +368,88 @@ async function sendLoginLink() {
 
   const { error } = await supabaseClient.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.href.split("#")[0] },
+    options: {
+      emailRedirectTo: window.location.href.split("#")[0],
+      shouldCreateUser: true,
+    },
   });
 
   els.sendLogin.disabled = false;
-  els.sendLogin.textContent = "发送验证码";
+  els.sendLogin.textContent = "验证码备用";
 
   if (error) {
     showNotice(`验证码发送失败：${error.message}`, "error");
     return;
   }
 
-  showNotice("验证码已发送，请到邮箱完成登录。", "info");
+  state.pendingOtp = true;
+  els.authCode.value = "";
+  updateAuthUI();
+  els.authCode.focus();
+  showNotice("验证码已发送，请输入邮件里的 8 位验证码。", "success");
+}
+
+async function verifyLoginCode() {
+  if (!supabaseClient) {
+    alert("请先在 config.js 填入 Supabase 项目配置。");
+    return;
+  }
+
+  const email = els.authEmail.value.trim();
+  const token = els.authCode?.value.trim() || "";
+  if (!email) {
+    els.authEmail.focus();
+    return;
+  }
+  if (!token || token.length < 8) {
+    els.authCode?.focus();
+    return;
+  }
+
+  els.verifyLogin.disabled = true;
+  els.verifyLogin.textContent = "验证中";
+
+  const { error } = await supabaseClient.auth.verifyOtp({ email, token, type: "email" });
+
+  els.verifyLogin.disabled = false;
+  els.verifyLogin.textContent = "验证登录";
+
+  if (error) {
+    showNotice(`登录失败：${error.message}`, "error");
+    return;
+  }
+
+  state.pendingOtp = false;
+  showNotice("登录成功，正在同步云端数据。", "success", 3000);
+}
+
+async function updatePassword() {
+  if (!supabaseClient) {
+    alert("请先在 config.js 填入 Supabase 项目配置。");
+    return;
+  }
+
+  const password = els.authPassword?.value || "";
+  if (!password || password.length < 6) {
+    els.authPassword?.focus();
+    return;
+  }
+
+  els.savePassword.disabled = true;
+  els.savePassword.textContent = "保存中";
+
+  const { error } = await supabaseClient.auth.updateUser({ password });
+
+  els.savePassword.disabled = false;
+  els.savePassword.textContent = "设置/更改密码";
+
+  if (error) {
+    showNotice(`密码设置失败：${error.message}`, "error");
+    return;
+  }
+
+  els.authPassword.value = "";
+  showNotice("密码已设置好。以后可以直接用邮箱和密码登录。", "success");
 }
 
 async function signOut() {
@@ -326,6 +459,7 @@ async function signOut() {
   state.mode = "local";
   state.user = null;
   state.pendingMigration = false;
+  state.pendingOtp = false;
   state.syncMessage = "";
   state.syncStatus = "local";
   applyLedgerData(localStore.readAll());
@@ -349,6 +483,7 @@ async function saveRecord() {
   const amount = Number(els.amountInput.value);
   if (!Number.isFinite(amount) || amount <= 0) return;
   const wasEditing = Boolean(state.editingId);
+  const snapshot = captureAppSnapshot();
 
   const payload = {
     id: state.editingId || makeId(),
@@ -371,7 +506,8 @@ async function saveRecord() {
   state.selectedMonth = payload.date.slice(0, 7);
   els.monthPicker.value = state.selectedMonth;
   render();
-  await commitStoreChange(() => activeStore().saveRecord(payload), wasEditing ? "记录已更新" : "记录已保存");
+  const saved = await commitStoreChange(() => activeStore().saveRecord(payload), wasEditing ? "记录已更新" : "记录已保存");
+  if (!saved) restoreAppSnapshot(snapshot);
 }
 
 async function addCategory() {
@@ -381,8 +517,13 @@ async function addCategory() {
   const list = state.categories[state.currentType];
   const exists = list.some((item) => item.toLowerCase() === name.toLowerCase());
   if (!exists) {
+    const snapshot = captureAppSnapshot();
     list.push(name);
-    await commitStoreChange(() => activeStore().saveCategory(state.currentType, name), "分类已保存");
+    const saved = await commitStoreChange(() => activeStore().saveCategory(state.currentType, name), "分类已保存");
+    if (!saved) {
+      restoreAppSnapshot(snapshot);
+      return;
+    }
   }
 
   els.categoryNameInput.value = "";
@@ -433,9 +574,18 @@ function updateAuthUI() {
   els.modeLabel.textContent = state.mode === "cloud" ? "云端同步" : "本地记账";
   els.authPanel.classList.toggle("is-hidden", !configured);
   els.authEmail.classList.toggle("is-hidden", !configured || state.user);
+  els.authPassword?.classList.toggle("is-hidden", !configured);
+  els.passwordLogin?.classList.toggle("is-hidden", !configured || state.user);
   els.sendLogin.classList.toggle("is-hidden", !configured || state.user);
+  els.authCode?.classList.toggle("is-hidden", !configured || state.user || !state.pendingOtp);
+  els.verifyLogin?.classList.toggle("is-hidden", !configured || state.user || !state.pendingOtp);
+  els.savePassword?.classList.toggle("is-hidden", !configured || !state.user);
   els.signOut.classList.toggle("is-hidden", !configured || !state.user);
   els.signOut.textContent = state.user?.email ? `退出 ${state.user.email}` : "退出";
+  if (els.authPassword) {
+    els.authPassword.placeholder = state.user ? "新密码（至少 6 位）" : "密码";
+    els.authPassword.autocomplete = state.user ? "new-password" : "current-password";
+  }
   renderStatusPill();
 }
 
@@ -860,6 +1010,7 @@ function renderChartView() {
 }
 
 async function deleteRecord(id) {
+  const snapshot = captureAppSnapshot();
   state.records = state.records.filter((record) => record.id !== id);
   if (state.editingId === id) {
     state.editingId = null;
@@ -867,7 +1018,8 @@ async function deleteRecord(id) {
     els.saveButton.textContent = "保存";
   }
   render();
-  await commitStoreChange(() => activeStore().deleteRecord(id), "记录已删除");
+  const saved = await commitStoreChange(() => activeStore().deleteRecord(id), "记录已删除");
+  if (!saved) restoreAppSnapshot(snapshot);
 }
 
 function resetForm() {
@@ -885,7 +1037,7 @@ function shiftMonth(offset) {
 }
 
 function exportLedgerData() {
-  const data = normalizeLedgerData({
+  const data = createLedgerExport({
     records: state.records,
     categories: state.categories,
     budget: state.budget,
@@ -904,11 +1056,13 @@ async function importLedgerData() {
   if (!file) return;
 
   try {
-    const imported = normalizeLedgerData(JSON.parse(await file.text()));
+    const snapshot = captureAppSnapshot();
+    const imported = parseLedgerImport(JSON.parse(await file.text()));
     const merged = mergeLedgerData({ records: state.records, categories: state.categories, budget: state.budget }, imported);
     applyLedgerData(merged);
     render();
-    await commitStoreChange(() => activeStore().saveAll(merged), "账本已导入");
+    const saved = await commitStoreChange(() => activeStore().saveAll(merged), "账本已导入");
+    if (!saved) restoreAppSnapshot(snapshot);
   } catch {
     showNotice("导入失败，请选择有效的账本 JSON 文件。", "error");
   } finally {
@@ -933,6 +1087,46 @@ async function commitStoreChange(action, successMessage = "已保存") {
     showNotice("保存失败，请稍后再试。", "error");
     return false;
   }
+}
+
+function captureAppSnapshot() {
+  return {
+    ledger: normalizeLedgerData({
+      records: state.records,
+      categories: state.categories,
+      budget: state.budget,
+    }),
+    selectedMonth: state.selectedMonth,
+    currentType: state.currentType,
+    editingId: state.editingId,
+    form: {
+      amount: els.amountInput.value,
+      category: els.categorySelect.value,
+      date: els.dateInput.value,
+      note: els.noteInput.value,
+      saveButtonText: els.saveButton.textContent,
+      categoryFormHidden: els.categoryForm.classList.contains("is-hidden"),
+    },
+  };
+}
+
+function restoreAppSnapshot(snapshot) {
+  applyLedgerData(snapshot.ledger);
+  state.selectedMonth = snapshot.selectedMonth;
+  state.currentType = snapshot.currentType;
+  state.editingId = snapshot.editingId;
+  els.monthPicker.value = state.selectedMonth;
+  render();
+  restoreFormSnapshot(snapshot.form);
+}
+
+function restoreFormSnapshot(form) {
+  populateCategories(form.category);
+  els.amountInput.value = form.amount;
+  els.dateInput.value = form.date;
+  els.noteInput.value = form.note;
+  els.saveButton.textContent = form.saveButtonText;
+  els.categoryForm.classList.toggle("is-hidden", form.categoryFormHidden);
 }
 
 function applyLedgerData(data) {
@@ -982,6 +1176,24 @@ function mergeLedgerData(base, incoming) {
     },
     budget: incoming.budget || base.budget,
   });
+}
+
+function createLedgerExport(data) {
+  return {
+    schemaVersion: LEDGER_EXPORT_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    ...normalizeLedgerData(data),
+  };
+}
+
+function parseLedgerImport(data) {
+  if (!data || typeof data !== "object") {
+    throw new Error("Invalid ledger import");
+  }
+  if (data.schemaVersion && data.schemaVersion !== LEDGER_EXPORT_SCHEMA_VERSION) {
+    throw new Error(`Unsupported ledger schema version: ${data.schemaVersion}`);
+  }
+  return normalizeLedgerData(data);
 }
 
 function createLocalStore() {
@@ -1159,6 +1371,31 @@ function getSupabaseConfig() {
   const supabaseAnonKey = String(config.supabaseAnonKey || "").trim();
   if (!supabaseUrl || !supabaseAnonKey) return null;
   return { supabaseUrl, supabaseAnonKey };
+}
+
+function createSupabaseClient(config) {
+  const client = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: AUTH_STORAGE_KEY,
+    },
+  });
+  window.__dailyLedgerSupabaseClient = client;
+  return client;
+}
+
+async function exchangeRedirectCode(client) {
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get("code");
+  if (!code || !client?.auth?.exchangeCodeForSession) return;
+
+  const { error } = await client.auth.exchangeCodeForSession(code);
+  if (error) throw error;
+
+  url.searchParams.delete("code");
+  window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
 }
 
 function loadSupabaseSdk() {

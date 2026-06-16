@@ -1,6 +1,6 @@
 # 每日收支
 
-一个极简本地记账网页 App，已预留 Supabase 云端同步。
+一个手机优先的极简记账网页 App，支持本地账本和 Supabase 云端同步。
 
 ## 本地使用
 
@@ -14,11 +14,20 @@ http://127.0.0.1:4173
 
 1. 在 Supabase 新建项目。
 2. 打开 Supabase SQL Editor，执行 `supabase.schema.sql`。
-3. 在 Supabase Auth 里开启 Email 登录。
+3. 在 Supabase Auth 里开启 Email 登录，并允许邮箱验证码或邮箱密码登录。
 4. 把项目 URL 和 publishable key 填到 `config.js`，不要使用 secret key。
-5. 回到页面后，用邮箱验证码登录。
+5. 回到页面后，优先用邮箱和密码登录；如果还没设置密码，可以用 8 位邮箱验证码备用登录。
+6. 登录后可以在同一个登录区域设置或更改密码。
 
 登录后如果浏览器里已有本地账本，页面会提示同步到云端。
+
+## 数据和同步边界
+
+- `config.js` 只保存浏览器可公开使用的 Supabase publishable key。
+- Supabase session 由 Supabase SDK 自己持久化，应用不额外复制 refresh token。
+- 本地账本、云端账本都走同一组账本数据对象：记录、分类、预算。
+- 导出的 JSON 带 `schemaVersion`，方便后续迁移到小程序或其他后端。
+- 云端保存失败时，页面会恢复到提交前的账本状态，避免看起来保存成功但云端未写入。
 
 ## 部署到 Vercel
 
