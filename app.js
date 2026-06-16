@@ -1,3 +1,4 @@
+const APP_VERSION = "0.2.0";
 const STORAGE_KEY = "daily-ledger-records-v1";
 const CATEGORY_KEY = "daily-ledger-categories-v1";
 const BUDGET_KEY = "daily-ledger-budget-v1";
@@ -5,6 +6,8 @@ const AUTH_STORAGE_KEY = "daily-ledger-supabase-auth";
 const AUTH_INTERNAL_DOMAIN = "daily-ledger.local";
 const LEDGER_EXPORT_SCHEMA_VERSION = 1;
 const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+
+window.__dailyLedgerVersion = APP_VERSION;
 
 const DEFAULT_CATEGORIES = {
   expense: ["餐饮", "交通", "购物", "住房", "娱乐", "医疗", "学习", "其他"],
