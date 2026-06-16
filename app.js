@@ -2,6 +2,7 @@ const STORAGE_KEY = "daily-ledger-records-v1";
 const CATEGORY_KEY = "daily-ledger-categories-v1";
 const BUDGET_KEY = "daily-ledger-budget-v1";
 const AUTH_STORAGE_KEY = "daily-ledger-supabase-auth";
+const AUTH_INTERNAL_DOMAIN = "daily-ledger.local";
 const LEDGER_EXPORT_SCHEMA_VERSION = 1;
 const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 
@@ -28,7 +29,6 @@ const state = {
   mode: "local",
   user: null,
   pendingMigration: false,
-  pendingOtp: false,
   syncMessage: "",
   syncKind: "info",
   syncStatus: "local",
@@ -41,12 +41,10 @@ const els = {
   pageTitle: document.querySelector("#pageTitle"),
   cloudStatus: document.querySelector("#cloudStatus"),
   authPanel: document.querySelector("#authPanel"),
-  authEmail: document.querySelector("#authEmail"),
+  authAccount: document.querySelector("#authAccount"),
   authPassword: document.querySelector("#authPassword"),
   passwordLogin: document.querySelector("#passwordLogin"),
-  sendLogin: document.querySelector("#sendLogin"),
-  authCode: document.querySelector("#authCode"),
-  verifyLogin: document.querySelector("#verifyLogin"),
+  registerAccount: document.querySelector("#registerAccount"),
   savePassword: document.querySelector("#savePassword"),
   signOut: document.querySelector("#signOut"),
   syncNotice: document.querySelector("#syncNotice"),
@@ -201,18 +199,17 @@ function bindEvents() {
   });
 
   els.passwordLogin?.addEventListener("click", signInWithPassword);
-  els.sendLogin.addEventListener("click", sendLoginCode);
-  els.verifyLogin?.addEventListener("click", verifyLoginCode);
+  els.registerAccount?.addEventListener("click", registerWithPassword);
   els.savePassword?.addEventListener("click", updatePassword);
+  els.authAccount?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    els.authPassword?.focus();
+  });
   els.authPassword?.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
     state.user ? updatePassword() : signInWithPassword();
-  });
-  els.authCode?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    verifyLoginCode();
   });
   els.signOut.addEventListener("click", signOut);
   els.migrateData.addEventListener("click", migrateLocalData);
@@ -267,7 +264,6 @@ async function setupCloudStore() {
       state.mode = state.user ? "cloud" : "local";
       state.syncMessage = "";
       if (state.user) {
-        state.pendingOtp = false;
         setSyncStatus("saving", "正在读取云端");
         state.pendingMigration = hasLocalData();
         await safeReloadCloudData();
@@ -275,7 +271,6 @@ async function setupCloudStore() {
           showNotice("登录成功，云端数据已同步。", "success", 3000);
         }
       } else {
-        state.pendingOtp = false;
         state.syncStatus = "local";
         applyLedgerData(localStore.readAll());
         if (event === "SIGNED_OUT") {
@@ -316,111 +311,133 @@ async function safeReloadCloudData() {
   }
 }
 
+async function readAuthCredentials() {
+  const rawAccount = els.authAccount?.value.trim() || "";
+  const password = els.authPassword?.value || "";
+  const account = normalizeAuthAccount(rawAccount);
+
+  if (!account) {
+    els.authAccount?.focus();
+    showNotice("账号名 2-32 位，可用中文、字母、数字、下划线或短横线。", "error");
+    return null;
+  }
+
+  if (!password || password.length < 6) {
+    els.authPassword?.focus();
+    showNotice("密码至少 6 位。", "error");
+    return null;
+  }
+
+  return {
+    account,
+    password,
+    email: await accountToAuthEmail(account),
+    usesEmail: account.includes("@"),
+  };
+}
+
+function normalizeAuthAccount(value) {
+  const account = value.trim().toLowerCase();
+  if (isValidEmail(account)) return account;
+  if (!/^[\p{L}\p{N}_-]{2,32}$/u.test(account)) return "";
+  return account;
+}
+
+async function accountToAuthEmail(account) {
+  if (account.includes("@")) return account;
+  return `u-${await hashAuthAccount(account)}@${AUTH_INTERNAL_DOMAIN}`;
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+async function hashAuthAccount(account) {
+  const input = `daily-ledger:${account}`;
+  if (window.crypto?.subtle && window.TextEncoder) {
+    const bytes = new TextEncoder().encode(input);
+    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest))
+      .slice(0, 16)
+      .map((byte) => byte.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  let hash = 2166136261;
+  for (const char of input) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
 async function signInWithPassword() {
   if (!supabaseClient) {
     alert("请先在 config.js 填入 Supabase 项目配置。");
     return;
   }
 
-  const email = els.authEmail.value.trim();
-  const password = els.authPassword?.value || "";
-  if (!email) {
-    els.authEmail.focus();
-    return;
-  }
-  if (!password || password.length < 6) {
-    els.authPassword?.focus();
-    return;
-  }
+  const credentials = await readAuthCredentials();
+  if (!credentials) return;
 
   els.passwordLogin.disabled = true;
   els.passwordLogin.textContent = "登录中";
 
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email: credentials.email,
+    password: credentials.password,
+  });
 
   els.passwordLogin.disabled = false;
-  els.passwordLogin.textContent = "密码登录";
+  els.passwordLogin.textContent = "登录";
 
   if (error) {
-    const message = error.message === "Invalid login credentials" ? "登录失败：邮箱或密码不对。如果还没设置过密码，请先用验证码备用登录一次。" : `登录失败：${error.message}`;
+    const message = error.message === "Invalid login credentials" ? "登录失败：账号名或密码不对。" : `登录失败：${error.message}`;
     showNotice(message, "error");
     return;
   }
 
-  state.pendingOtp = false;
   showNotice("登录成功，正在同步云端数据。", "success", 3000);
 }
 
-async function sendLoginCode() {
+async function registerWithPassword() {
   if (!supabaseClient) {
     alert("请先在 config.js 填入 Supabase 项目配置。");
     return;
   }
 
-  const email = els.authEmail.value.trim();
-  if (!email) {
-    els.authEmail.focus();
-    return;
-  }
+  const credentials = await readAuthCredentials();
+  if (!credentials) return;
 
-  els.sendLogin.disabled = true;
-  els.sendLogin.textContent = "发送中";
+  els.registerAccount.disabled = true;
+  els.registerAccount.textContent = "注册中";
 
-  const { error } = await supabaseClient.auth.signInWithOtp({
-    email,
+  const { data, error } = await supabaseClient.auth.signUp({
+    email: credentials.email,
+    password: credentials.password,
     options: {
-      emailRedirectTo: window.location.href.split("#")[0],
-      shouldCreateUser: true,
+      data: {
+        ledger_account: credentials.account,
+        auth_method: credentials.usesEmail ? "email" : "username",
+      },
     },
   });
 
-  els.sendLogin.disabled = false;
-  els.sendLogin.textContent = "验证码备用";
+  els.registerAccount.disabled = false;
+  els.registerAccount.textContent = "注册";
 
   if (error) {
-    showNotice(`验证码发送失败：${error.message}`, "error");
+    const message = error.message.toLowerCase().includes("already") ? "这个账号已经注册过，请直接登录。" : `注册失败：${error.message}`;
+    showNotice(message, "error");
     return;
   }
 
-  state.pendingOtp = true;
-  els.authCode.value = "";
-  updateAuthUI();
-  els.authCode.focus();
-  showNotice("验证码已发送，请输入邮件里的 8 位验证码。", "success");
-}
-
-async function verifyLoginCode() {
-  if (!supabaseClient) {
-    alert("请先在 config.js 填入 Supabase 项目配置。");
+  if (!data.session) {
+    showNotice("注册已提交，但 Supabase 还在要求邮箱确认。请先在 Supabase 关闭邮箱确认，再重新注册或登录。", "error", 7000);
     return;
   }
 
-  const email = els.authEmail.value.trim();
-  const token = els.authCode?.value.trim() || "";
-  if (!email) {
-    els.authEmail.focus();
-    return;
-  }
-  if (!token || token.length < 8) {
-    els.authCode?.focus();
-    return;
-  }
-
-  els.verifyLogin.disabled = true;
-  els.verifyLogin.textContent = "验证中";
-
-  const { error } = await supabaseClient.auth.verifyOtp({ email, token, type: "email" });
-
-  els.verifyLogin.disabled = false;
-  els.verifyLogin.textContent = "验证登录";
-
-  if (error) {
-    showNotice(`登录失败：${error.message}`, "error");
-    return;
-  }
-
-  state.pendingOtp = false;
-  showNotice("登录成功，正在同步云端数据。", "success", 3000);
+  showNotice("注册成功，正在同步云端数据。", "success", 3000);
 }
 
 async function updatePassword() {
@@ -449,7 +466,7 @@ async function updatePassword() {
   }
 
   els.authPassword.value = "";
-  showNotice("密码已设置好。以后可以直接用邮箱和密码登录。", "success");
+  showNotice("密码已更新。以后直接用账号名和密码登录。", "success");
 }
 
 async function signOut() {
@@ -459,7 +476,6 @@ async function signOut() {
   state.mode = "local";
   state.user = null;
   state.pendingMigration = false;
-  state.pendingOtp = false;
   state.syncMessage = "";
   state.syncStatus = "local";
   applyLedgerData(localStore.readAll());
@@ -573,15 +589,13 @@ function updateAuthUI() {
   const configured = Boolean(getSupabaseConfig());
   els.modeLabel.textContent = state.mode === "cloud" ? "云端同步" : "本地记账";
   els.authPanel.classList.toggle("is-hidden", !configured);
-  els.authEmail.classList.toggle("is-hidden", !configured || state.user);
+  els.authAccount?.classList.toggle("is-hidden", !configured || state.user);
   els.authPassword?.classList.toggle("is-hidden", !configured);
   els.passwordLogin?.classList.toggle("is-hidden", !configured || state.user);
-  els.sendLogin.classList.toggle("is-hidden", !configured || state.user);
-  els.authCode?.classList.toggle("is-hidden", !configured || state.user || !state.pendingOtp);
-  els.verifyLogin?.classList.toggle("is-hidden", !configured || state.user || !state.pendingOtp);
+  els.registerAccount?.classList.toggle("is-hidden", !configured || state.user);
   els.savePassword?.classList.toggle("is-hidden", !configured || !state.user);
   els.signOut.classList.toggle("is-hidden", !configured || !state.user);
-  els.signOut.textContent = state.user?.email ? `退出 ${state.user.email}` : "退出";
+  els.signOut.textContent = "退出登录";
   if (els.authPassword) {
     els.authPassword.placeholder = state.user ? "新密码（至少 6 位）" : "密码";
     els.authPassword.autocomplete = state.user ? "new-password" : "current-password";

@@ -24,13 +24,11 @@
         <div class="top-actions">
           <button class="status-pill" id="cloudStatus" type="button">本地模式 · 未登录</button>
           <form class="auth-panel" id="authPanel">
-            <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email" />
+            <input id="authAccount" type="text" placeholder="账号名" autocomplete="username" autocapitalize="none" spellcheck="false" />
             <input id="authPassword" type="password" minlength="6" placeholder="密码" autocomplete="current-password" />
-            <button class="secondary-button" id="passwordLogin" type="button">密码登录</button>
-            <button class="secondary-button" id="sendLogin" type="button">验证码备用</button>
-            <input class="is-hidden" id="authCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="8 位验证码" />
-            <button class="secondary-button is-hidden" id="verifyLogin" type="button">验证登录</button>
-            <button class="secondary-button is-hidden" id="savePassword" type="button">设置/更改密码</button>
+            <button class="secondary-button" id="passwordLogin" type="button">登录</button>
+            <button class="secondary-button" id="registerAccount" type="button">注册</button>
+            <button class="secondary-button is-hidden" id="savePassword" type="button">更改密码</button>
             <button class="plain-button is-hidden" id="signOut" type="button">退出</button>
           </form>
           <div class="month-switcher" aria-label="选择统计月份">

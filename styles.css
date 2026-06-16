@@ -1042,9 +1042,8 @@ body {
     white-space: normal;
   }
 
-  #authEmail,
+  #authAccount,
   #authPassword,
-  #authCode,
   #savePassword,
   #signOut {
     grid-column: 1 / -1;
