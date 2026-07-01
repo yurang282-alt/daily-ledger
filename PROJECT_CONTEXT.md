@@ -63,3 +63,58 @@
 - Supabase schema: `supabase.schema.sql`
 - PWA manifest: `manifest.json`
 - Deployment: Vercel static project, build/output empty
+
+## CloudBase Resource Ownership
+
+- Updated: 2026-06-30.
+- CloudBase environment: `cloud1-d3g79qnvd808824c9`.
+- Canonical static hosting path: `/apps/ledger/`.
+- User-facing URL: `https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`.
+- Root `/` is reserved for Rocky App 工厂 launcher; do not deploy Daily Bookkeeping to `/`.
+- Current online staging copy has scoped service-worker cleanup, but the source project should be patched before the next CloudBase deploy.
+- Service-worker rule: do not unregister or clear caches for the whole origin when sharing the CloudBase default domain with other apps.
+- Source of truth before any CloudBase work: `/Users/bytedance/Documents/Codex/cloudbase-deployment-registry.md`.
+
+## Design Agent Governance
+
+Source of truth: /Users/bytedance/Documents/Codex/app-design-agent-routing-rule.md and /Users/bytedance/Documents/Codex/agent-briefs/design-director-agent.md.
+
+Daily Bookkeeping should use the Product Design Director Agent whenever a new user-facing surface, UI change, prototype, redesign, or friend/team-facing release is discussed.
+
+Design Agent intervention check:
+
+```text
+设计 Agent 介入判断：
+- 是否有用户界面：
+- 是否面向真实用户 / 朋友 / 团队：
+- 是否需要和其他 App 形成明显差异：
+- 是否有强场景气质：
+- 是否会影响核心流程或首次体验：
+- 是否已有截图/原型/页面可审：
+- 介入级别：L0 / L1 / L2 / L3 / L4
+- 本次产出：
+```
+
+Intervention levels:
+
+- L0: no design agent for pure backend, scripts, data processing, or tiny non-UI fixes.
+- L1: design DNA for a new user-facing app or early product idea.
+- L2: design audit for an existing UI, screenshot, URL, or runnable demo.
+- L3: redesign direction for core pages, onboarding, navigation, or first-use experience.
+- L4: portfolio design system when multiple apps need shared components but distinct visual identities.
+
+
+This project's design DNA:
+
+- Product identity: Personal ledger for fast income/expense recording.
+- Desired feeling: Reliable, quiet, low-friction, financially clear.
+- Design direction: Ledger-like structure, strong amount hierarchy, compact mobile entry, sober colors.
+- Avoid: Flashy fintech dashboard, decorative charts before data is reliable.
+- First design focus: Make record, review, export, and recovery feel trustworthy.
+
+Boundaries:
+
+- The design agent defines design DNA, audits UI/UX fit, and produces design recommendations.
+- The main product partner + CTO agent still decides priority, product scope, architecture, release, and whether implementation should start.
+- The design agent does not publish, merge, deploy, change databases, or change permissions by default.
+
