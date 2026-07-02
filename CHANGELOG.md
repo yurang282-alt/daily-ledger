@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Migrated the active cloud backend from Supabase to CloudBase `daily-ledger-api`.
+- Added CloudBase username/password registration, login, password update, and signed session storage.
+- Added CloudBase ledger collections for users, records, categories, and settings with server-side owner scoping.
+- Verified CloudBase health, CORS, register, save/read, two-account isolation, static `/apps/ledger/`, and browser page load.
 - Scoped service worker cleanup to the current app path so CloudBase `/apps/ledger/` does not affect other apps on the same default domain.
 - Changed local-to-cloud wording from sync to merge and added a preflight summary.
 - Added JSON backup downloads before importing, clearing a month, or merging local data to cloud.

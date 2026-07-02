@@ -1,11 +1,10 @@
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.3.0";
 const STORAGE_KEY = "daily-ledger-records-v1";
 const CATEGORY_KEY = "daily-ledger-categories-v1";
 const BUDGET_KEY = "daily-ledger-budget-v1";
-const AUTH_STORAGE_KEY = "daily-ledger-supabase-auth";
-const AUTH_INTERNAL_DOMAIN = "daily-ledger.local";
+const AUTH_STORAGE_KEY = "daily-ledger-cloudbase-session";
 const LEDGER_EXPORT_SCHEMA_VERSION = 1;
-const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+const DEFAULT_CLOUDBASE_API_BASE = "https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api";
 
 window.__dailyLedgerVersion = APP_VERSION;
 
@@ -18,7 +17,7 @@ const CHART_COLORS = ["#315f9b", "#20785a", "#c17a19", "#7b5bb7", "#c7483c", "#4
 
 const localStore = createLocalStore();
 let cloudStore = null;
-let supabaseClient = null;
+let cloudApiClient = null;
 let noticeTimer = null;
 let speechRecognition = null;
 
@@ -244,48 +243,25 @@ async function loadInitialData() {
 }
 
 async function setupCloudStore() {
-  const config = getSupabaseConfig();
+  const config = getCloudbaseConfig();
   if (!config) {
     return;
   }
 
   try {
-    await loadSupabaseSdk();
-    supabaseClient = createSupabaseClient(config);
-    await exchangeRedirectCode(supabaseClient);
-    const { data } = await supabaseClient.auth.getSession();
-    state.user = data.session?.user || null;
-    cloudStore = createCloudStore(supabaseClient);
+    cloudApiClient = createCloudbaseApiClient(config);
+    cloudStore = createCloudStore(cloudApiClient);
+    const session = cloudApiClient.getSession();
 
-    if (state.user) {
+    if (session?.token) {
+      state.user = await cloudApiClient.me();
       state.mode = "cloud";
       state.syncStatus = "cloud";
       state.pendingMigration = hasLocalData();
     }
-
-    supabaseClient.auth.onAuthStateChange(async (event, session) => {
-      state.user = session?.user || null;
-      state.mode = state.user ? "cloud" : "local";
-      state.syncMessage = "";
-      if (state.user) {
-        setSyncStatus("saving", "正在读取云端");
-        state.pendingMigration = hasLocalData();
-        await safeReloadCloudData();
-        if (event === "SIGNED_IN") {
-          showNotice("登录成功，云端数据已同步。", "success", 3000);
-        }
-      } else {
-        state.syncStatus = "local";
-        applyLedgerData(localStore.readAll());
-        if (event === "SIGNED_OUT") {
-          showNotice("已退出云端账号，当前使用本地账本。", "info", 3000);
-        }
-      }
-      updateAuthUI();
-      render();
-    });
   } catch (error) {
     console.warn("Cloud setup failed:", error);
+    cloudApiClient?.clearSession();
     state.mode = "local";
     state.user = null;
     state.syncStatus = "error";
@@ -306,6 +282,9 @@ async function safeReloadCloudData() {
     await reloadCloudData();
   } catch (error) {
     console.error("Cloud load failed:", error);
+    if (error.status === 401) {
+      cloudApiClient?.clearSession();
+    }
     state.mode = "local";
     state.user = null;
     state.pendingMigration = false;
@@ -335,8 +314,6 @@ async function readAuthCredentials() {
   return {
     account,
     password,
-    email: await accountToAuthEmail(account),
-    usesEmail: account.includes("@"),
   };
 }
 
@@ -347,37 +324,13 @@ function normalizeAuthAccount(value) {
   return account;
 }
 
-async function accountToAuthEmail(account) {
-  if (account.includes("@")) return account;
-  return `u-${await hashAuthAccount(account)}@${AUTH_INTERNAL_DOMAIN}`;
-}
-
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-async function hashAuthAccount(account) {
-  const input = `daily-ledger:${account}`;
-  if (window.crypto?.subtle && window.TextEncoder) {
-    const bytes = new TextEncoder().encode(input);
-    const digest = await window.crypto.subtle.digest("SHA-256", bytes);
-    return Array.from(new Uint8Array(digest))
-      .slice(0, 16)
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
-  }
-
-  let hash = 2166136261;
-  for (const char of input) {
-    hash ^= char.codePointAt(0);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0");
-}
-
 async function signInWithPassword() {
-  if (!supabaseClient) {
-    alert("请先在 config.js 填入 Supabase 项目配置。");
+  if (!cloudApiClient) {
+    alert("请先在 config.js 填入 CloudBase API 配置。");
     return;
   }
 
@@ -387,26 +340,22 @@ async function signInWithPassword() {
   els.passwordLogin.disabled = true;
   els.passwordLogin.textContent = "登录中";
 
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email: credentials.email,
-    password: credentials.password,
-  });
-
-  els.passwordLogin.disabled = false;
-  els.passwordLogin.textContent = "登录";
-
-  if (error) {
-    const message = error.message === "Invalid login credentials" ? "登录失败：账号名或密码不对。" : `登录失败：${error.message}`;
-    showNotice(message, "error");
-    return;
+  try {
+    const session = await cloudApiClient.login(credentials.account, credentials.password);
+    await applyCloudSession(session);
+    els.authPassword.value = "";
+    showNotice("登录成功，正在同步云端数据。", "success", 3000);
+  } catch (error) {
+    showNotice(`登录失败：${error.message}`, "error");
+  } finally {
+    els.passwordLogin.disabled = false;
+    els.passwordLogin.textContent = "登录";
   }
-
-  showNotice("登录成功，正在同步云端数据。", "success", 3000);
 }
 
 async function registerWithPassword() {
-  if (!supabaseClient) {
-    alert("请先在 config.js 填入 Supabase 项目配置。");
+  if (!cloudApiClient) {
+    alert("请先在 config.js 填入 CloudBase API 配置。");
     return;
   }
 
@@ -416,37 +365,22 @@ async function registerWithPassword() {
   els.registerAccount.disabled = true;
   els.registerAccount.textContent = "注册中";
 
-  const { data, error } = await supabaseClient.auth.signUp({
-    email: credentials.email,
-    password: credentials.password,
-    options: {
-      data: {
-        ledger_account: credentials.account,
-        auth_method: credentials.usesEmail ? "email" : "username",
-      },
-    },
-  });
-
-  els.registerAccount.disabled = false;
-  els.registerAccount.textContent = "注册";
-
-  if (error) {
-    const message = error.message.toLowerCase().includes("already") ? "这个账号已经注册过，请直接登录。" : `注册失败：${error.message}`;
-    showNotice(message, "error");
-    return;
+  try {
+    const session = await cloudApiClient.register(credentials.account, credentials.password);
+    await applyCloudSession(session);
+    els.authPassword.value = "";
+    showNotice("注册成功，正在同步云端数据。", "success", 3000);
+  } catch (error) {
+    showNotice(`注册失败：${error.message}`, "error");
+  } finally {
+    els.registerAccount.disabled = false;
+    els.registerAccount.textContent = "注册";
   }
-
-  if (!data.session) {
-    showNotice("注册已提交，但 Supabase 还在要求邮箱确认。请先在 Supabase 关闭邮箱确认，再重新注册或登录。", "error", 7000);
-    return;
-  }
-
-  showNotice("注册成功，正在同步云端数据。", "success", 3000);
 }
 
 async function updatePassword() {
-  if (!supabaseClient) {
-    alert("请先在 config.js 填入 Supabase 项目配置。");
+  if (!cloudApiClient) {
+    alert("请先在 config.js 填入 CloudBase API 配置。");
     return;
   }
 
@@ -459,24 +393,37 @@ async function updatePassword() {
   els.savePassword.disabled = true;
   els.savePassword.textContent = "保存中";
 
-  const { error } = await supabaseClient.auth.updateUser({ password });
-
-  els.savePassword.disabled = false;
-  els.savePassword.textContent = "设置/更改密码";
-
-  if (error) {
+  try {
+    await cloudApiClient.updatePassword(password);
+    els.authPassword.value = "";
+    showNotice("密码已更新。以后直接用账号名和密码登录。", "success");
+  } catch (error) {
     showNotice(`密码设置失败：${error.message}`, "error");
-    return;
+  } finally {
+    els.savePassword.disabled = false;
+    els.savePassword.textContent = "设置/更改密码";
   }
+}
 
-  els.authPassword.value = "";
-  showNotice("密码已更新。以后直接用账号名和密码登录。", "success");
+async function applyCloudSession(session) {
+  cloudApiClient.setSession(session);
+  state.user = {
+    id: session.ownerId,
+    ownerId: session.ownerId,
+    accountName: session.accountName,
+  };
+  cloudStore = createCloudStore(cloudApiClient);
+  state.mode = "cloud";
+  state.syncStatus = "cloud";
+  state.pendingMigration = hasLocalData();
+  setSyncStatus("saving", "正在读取云端");
+  await reloadCloudData();
+  updateAuthUI();
+  render();
 }
 
 async function signOut() {
-  if (supabaseClient) {
-    await supabaseClient.auth.signOut();
-  }
+  cloudApiClient?.clearSession();
   state.mode = "local";
   state.user = null;
   state.pendingMigration = false;
@@ -626,7 +573,7 @@ function renderSyncNotice() {
 }
 
 function updateAuthUI() {
-  const configured = Boolean(getSupabaseConfig());
+  const configured = Boolean(getCloudbaseConfig());
   els.modeLabel.textContent = state.mode === "cloud" ? "云端同步" : "本地记账";
   els.authPanel.classList.toggle("is-hidden", !configured);
   els.authAccount?.classList.toggle("is-hidden", !configured || state.user);
@@ -644,7 +591,7 @@ function updateAuthUI() {
 }
 
 function renderStatusPill() {
-  const configured = Boolean(getSupabaseConfig());
+  const configured = Boolean(getCloudbaseConfig());
   let label = "本地模式";
   let kind = "local";
 
@@ -1361,98 +1308,29 @@ function createLocalStore() {
 function createCloudStore(client) {
   return {
     async readAll() {
-      const userId = state.user.id;
-      const [{ data: records, error: recordsError }, { data: categories, error: categoriesError }, { data: settings, error: settingsError }] =
-        await Promise.all([
-          client.from("ledger_records").select("*").eq("user_id", userId).order("entry_date", { ascending: false }),
-          client.from("ledger_categories").select("*").eq("user_id", userId),
-          client.from("ledger_settings").select("*").eq("user_id", userId).maybeSingle(),
-        ]);
-
-      throwIfError(recordsError || categoriesError || settingsError);
-
-      return normalizeLedgerData({
-        records: (records || []).map(recordFromRow),
-        categories: categoriesFromRows(categories || []),
-        budget: Number(settings?.monthly_budget || 0),
-      });
+      const response = await client.request("GET", "/ledger");
+      return normalizeLedgerData(response.data);
     },
     async saveAll(data) {
       const normalized = normalizeLedgerData(data);
-      const userId = state.user.id;
-      const recordRows = normalized.records.map((record) => recordToRow(record, userId));
-      const categoryRows = categoriesToRows(normalized.categories, userId);
-
-      if (recordRows.length) {
-        throwIfError((await client.from("ledger_records").upsert(recordRows)).error);
-      }
-      if (categoryRows.length) {
-        throwIfError((await client.from("ledger_categories").upsert(categoryRows, { onConflict: "user_id,kind,name" })).error);
-      }
-      await this.saveBudget(normalized.budget);
+      await client.request("PUT", "/ledger", { ledger: normalized });
     },
     async saveRecord(record) {
-      throwIfError((await client.from("ledger_records").upsert(recordToRow(record, state.user.id))).error);
+      await client.request("POST", "/records", { record });
     },
     async deleteRecord(id) {
-      throwIfError((await client.from("ledger_records").delete().eq("id", id).eq("user_id", state.user.id)).error);
+      await client.request("DELETE", `/records/${encodeURIComponent(id)}`);
     },
     async clearMonth(month) {
-      const start = `${month}-01`;
-      const [year, monthNumber] = month.split("-").map(Number);
-      const end = toDateValue(new Date(year, monthNumber, 1));
-      throwIfError((await client.from("ledger_records").delete().eq("user_id", state.user.id).gte("entry_date", start).lt("entry_date", end)).error);
+      await client.request("DELETE", `/records?month=${encodeURIComponent(month)}`);
     },
     async saveCategory(type, name) {
-      throwIfError((await client.from("ledger_categories").upsert({ user_id: state.user.id, kind: type, name }, { onConflict: "user_id,kind,name" })).error);
+      await client.request("POST", "/categories", { kind: type, name });
     },
     async saveBudget(budget) {
-      throwIfError((await client.from("ledger_settings").upsert({ user_id: state.user.id, monthly_budget: budget, updated_at: new Date().toISOString() })).error);
+      await client.request("PUT", "/settings/budget", { budget });
     },
   };
-}
-
-function recordToRow(record, userId) {
-  return {
-    id: record.id,
-    user_id: userId,
-    type: record.type,
-    amount: record.amount,
-    category: record.category,
-    entry_date: record.date,
-    note: record.note || "",
-  };
-}
-
-function recordFromRow(row) {
-  return {
-    id: row.id,
-    type: row.type,
-    amount: Number(row.amount),
-    category: row.category,
-    date: row.entry_date,
-    note: row.note || "",
-  };
-}
-
-function categoriesFromRows(rows) {
-  return rows.reduce(
-    (result, row) => {
-      result[row.kind] = mergeLists(result[row.kind], [row.name]);
-      return result;
-    },
-    structuredClone(DEFAULT_CATEGORIES),
-  );
-}
-
-function categoriesToRows(categories, userId) {
-  return ["expense", "income"].flatMap((kind) => categories[kind].map((name) => ({ user_id: userId, kind, name })));
-}
-
-function throwIfError(error) {
-  if (error) {
-    throw error;
-  }
 }
 
 function ensureCategoryShape() {
@@ -1486,58 +1364,69 @@ function loadJSON(key, fallback) {
   }
 }
 
-function getSupabaseConfig() {
+function getCloudbaseConfig() {
   const config = window.APP_CONFIG || {};
-  const supabaseUrl = String(config.supabaseUrl || "").trim();
-  const supabaseAnonKey = String(config.supabaseAnonKey || "").trim();
-  if (!supabaseUrl || !supabaseAnonKey) return null;
-  return { supabaseUrl, supabaseAnonKey };
+  const cloudbaseApiBase = String(config.cloudbaseApiBase || DEFAULT_CLOUDBASE_API_BASE || "").trim().replace(/\/+$/g, "");
+  if (!cloudbaseApiBase) return null;
+  return { cloudbaseApiBase };
 }
 
-function createSupabaseClient(config) {
-  const client = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storageKey: AUTH_STORAGE_KEY,
+function createCloudbaseApiClient(config) {
+  const apiBase = config.cloudbaseApiBase;
+  return {
+    getSession() {
+      return loadJSON(AUTH_STORAGE_KEY, null);
     },
-  });
-  window.__dailyLedgerSupabaseClient = client;
-  return client;
-}
-
-async function exchangeRedirectCode(client) {
-  const url = new URL(window.location.href);
-  const code = url.searchParams.get("code");
-  if (!code || !client?.auth?.exchangeCodeForSession) return;
-
-  const { error } = await client.auth.exchangeCodeForSession(code);
-  if (error) throw error;
-
-  url.searchParams.delete("code");
-  window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
-}
-
-function loadSupabaseSdk() {
-  if (window.supabase?.createClient) {
-    return Promise.resolve();
-  }
-
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${SUPABASE_SDK_URL}"]`);
-    if (existing) {
-      existing.addEventListener("load", resolve, { once: true });
-      existing.addEventListener("error", reject, { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = SUPABASE_SDK_URL;
-    script.onload = resolve;
-    script.onerror = reject;
-    document.head.append(script);
-  });
+    setSession(session) {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+    },
+    clearSession() {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    },
+    async request(method, path, body) {
+      const session = this.getSession();
+      const headers = {
+        "content-type": "application/json",
+      };
+      if (session?.token) {
+        headers["x-daily-ledger-session"] = session.token;
+      }
+      const response = await fetch(`${apiBase}${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) {
+        const error = new Error(data.error || `请求失败：${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      return data;
+    },
+    async login(accountName, password) {
+      const response = await this.request("POST", "/login", { accountName, password });
+      this.setSession(response.session);
+      return response.session;
+    },
+    async register(accountName, password) {
+      const response = await this.request("POST", "/register", { accountName, password });
+      this.setSession(response.session);
+      return response.session;
+    },
+    async me() {
+      const response = await this.request("GET", "/me");
+      return {
+        id: response.user.ownerId,
+        ownerId: response.user.ownerId,
+        accountName: response.user.accountName,
+      };
+    },
+    async updatePassword(password) {
+      await this.request("POST", "/password", { password });
+    },
+  };
 }
 
 function mergeLists(first = [], second = []) {

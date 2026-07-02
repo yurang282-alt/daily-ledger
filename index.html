@@ -8,12 +8,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="每日收支" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="app-version" content="0.2.0" />
+    <meta name="app-version" content="0.3.0" />
     <title>每日收支</title>
     <link rel="manifest" href="./manifest.json" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260615-redesign" />
+    <link rel="stylesheet" href="./styles.css?v=20260702-cloudbase" />
   </head>
   <body class="mobile-view-home mobile-chart-category">
     <main class="app-shell">
@@ -232,8 +232,8 @@
       </button>
     </nav>
 
-    <script src="./config.js?v=20260615-redesign"></script>
-    <script src="./app.js?v=20260615-redesign"></script>
+    <script src="./config.js?v=20260702-cloudbase"></script>
+    <script src="./app.js?v=20260702-cloudbase"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", async () => {
@@ -250,9 +250,14 @@
             if (window.caches) {
               const keys = await caches.keys();
               const scopedCachePrefix = `daily-ledger:${appBasePath}`;
+              const isOwnedCache = (key) => (
+                isSharedCloudBaseHost
+                  ? key.startsWith(scopedCachePrefix)
+                  : key === "daily-ledger" || key.startsWith("daily-ledger-") || key.startsWith(scopedCachePrefix)
+              );
               await Promise.all(
                 keys
-                  .filter((key) => key === "daily-ledger" || key.startsWith("daily-ledger-") || key.startsWith(scopedCachePrefix))
+                  .filter(isOwnedCache)
                   .map((key) => caches.delete(key)),
               );
             }

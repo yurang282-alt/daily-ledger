@@ -2,7 +2,7 @@
 
 ## One-Liner
 
-每日收支 is a mobile-first lightweight bookkeeping web app for personal income and expense tracking, supporting local ledger use and optional Supabase cloud sync.
+每日收支 is a mobile-first lightweight bookkeeping web app for personal income and expense tracking, supporting local ledger use and optional CloudBase cloud sync.
 
 ## User And Problem
 
@@ -14,33 +14,33 @@
 ## Product Shape
 
 - Core flow: Open app -> add income/expense record -> choose category/date/note -> review monthly totals and budget -> optionally log in -> sync local ledger to cloud -> export JSON if needed.
-- Must-have: Local ledger, income/expense records, categories, monthly budget/settings, Supabase username/password auth, cloud sync, rollback on failed cloud save, JSON export with schema version, PWA install metadata.
-- Explicit non-goals: Investment advice, bank-card aggregation, automatic transaction import, multi-user family sharing, complex accounting, or storing privileged Supabase keys in the client.
+- Must-have: Local ledger, income/expense records, categories, monthly budget/settings, CloudBase username/password auth, cloud sync, rollback on failed cloud save, JSON export with schema version, PWA install metadata.
+- Explicit non-goals: Investment advice, bank-card aggregation, automatic transaction import, multi-user family sharing, complex accounting, or storing privileged CloudBase/API secrets in the client.
 - Important states: Local-only use, logged-in cloud sync, existing local ledger prompt before sync, failed cloud save rollback, PWA install on mobile.
 
 ## Current Status
 
-- Stage: Usable static mobile web/PWA with local ledger and Supabase Auth/sync.
-- Working version: `v0.2.0` documents local use, Supabase setup, username/password login, password change, local-to-cloud sync prompt, rollback on failed cloud write, JSON export schema version, and PWA installation.
+- Stage: Usable static mobile web/PWA with local ledger and verified CloudBase API sync.
+- Working version: `v0.3.0` uses CloudBase `daily-ledger-api` for active cloud auth/data, while keeping local ledger, username/password login, password change, local-to-cloud merge prompt, rollback on failed cloud write, JSON export schema version, and PWA installation.
 - Local state: Open `index.html` directly or serve locally at `http://127.0.0.1:4173`.
 - GitHub state: `main` and `codex/username-password-auth` pointed to `14acc2d Replace email OTP with username password auth` before version-management changes.
-- Deployment state: Production URL `https://daily-ledger-ten-inky.vercel.app/` was verified after username auth deployment.
+- Deployment state: CloudBase `/apps/ledger/` is the primary production path; Vercel remains an optional mirror.
 - In-app/release state: `VERSION`, `CHANGELOG.md`, Git tags, and a static app-version meta tag track stable releases.
 
 ## Architecture
 
 - Client/platform: Static mobile-first web app / PWA.
-- Backend/data: Local browser ledger plus optional Supabase cloud persistence.
-- Auth/identity: Supabase Auth with username/password UX mapped to a Supabase-compatible internal login identity; no real user email or verification code required.
-- Storage: Local ledger data object includes records, categories, and budget/settings. Cloud tables are `ledger_records`, `ledger_categories`, and `ledger_settings`.
-- External services: Supabase Auth/Postgres; Vercel static hosting optional.
-- Key constraints: `config.js` must only contain browser-safe Supabase publishable key, never secret/service-role keys. Row-level security is enabled in `supabase.schema.sql`.
+- Backend/data: Local browser ledger plus optional CloudBase HTTP API persistence.
+- Auth/identity: CloudBase `daily-ledger-api` username/password auth; the API stores salted password hashes and signs long-lived session tokens; no real user email or verification code required.
+- Storage: Local ledger data object includes records, categories, and budget/settings. CloudBase collections are `daily_ledger_users`, `daily_ledger_records`, `daily_ledger_categories`, and `daily_ledger_settings`.
+- External services: CloudBase HTTP function/database/static hosting; Vercel static hosting optional as a mirror.
+- Key constraints: `config.js` must only contain browser-safe CloudBase API URL, never function secrets or privileged cloud credentials. All finance data reads/writes must go through `daily-ledger-api` and include server-side owner scoping.
 
 ## Decisions
 
-- Chosen path: Keep a static web/PWA app with local-first data and optional Supabase sync.
+- Chosen path: Keep a static web/PWA app with local-first data and optional CloudBase sync.
 - Rejected paths: Do not add bank automation, investments, family sharing, or complex accounting before data correctness, privacy, export, and recovery are strong.
-- Why: Personal finance data needs reliability and privacy more than feature breadth. Static/PWA plus Supabase is enough if sync and rollback stay trustworthy.
+- Why: Personal finance data needs reliability and privacy more than feature breadth. CloudBase removes the VPN dependency while keeping the PWA surface and JSON backup path.
 - Revisit trigger: Before exposing to friends, moving to Mini Program, adding recurring records, or changing backend.
 
 ## Risks
@@ -48,21 +48,22 @@
 - Product risk: If recording is not quick enough or categories feel wrong, the user will stop using it.
 - Technical risk: Local and cloud data can diverge if sync, rollback, and migration are not tested carefully.
 - Data/privacy risk: Financial records are sensitive; export, backup, row-level security, and key handling must be treated as core product requirements.
-- Release risk: Local file, local server, GitHub, Vercel deployment, Supabase Auth redirect config, and installed PWA can each be out of sync.
+- Release risk: Local file, local server, GitHub, CloudBase static hosting, CloudBase HTTP function, Vercel mirror, and installed PWA can each be out of sync.
 
 ## Next Actions
 
-- Now: Tag the current stable username-login baseline and use it for rollback before adding new bookkeeping features.
-- Later: Confirm export/restore, backup path, schema migration plan, and whether the app should stay PWA or move to Mini Program.
-- Blocked: Current deployed URL and Supabase project configuration need verification before any friend-facing or cross-device recommendation.
+- Now: Use the CloudBase URL on phone and desktop with a real account, then export a JSON backup after the first real records are confirmed.
+- Later: Run a controlled Supabase-to-CloudBase data migration using JSON export/import only if old Supabase records still matter, then decide whether Supabase can be retired.
+- Blocked: Existing Supabase data should not be deleted until the user confirms real CloudBase records and backup/restore are correct.
 
 ## Useful Commands Or Links
 
 - Local file: `index.html`
 - Local preview URL: `http://127.0.0.1:4173`
-- Supabase schema: `supabase.schema.sql`
+- Legacy Supabase schema: `supabase.schema.sql`
+- CloudBase API: `cloudfunctions/dailyLedgerApi`
 - PWA manifest: `manifest.json`
-- Deployment: Vercel static project, build/output empty
+- Deployment: CloudBase static hosting `/apps/ledger/` plus HTTP function `daily-ledger-api`; Vercel is optional mirror only.
 
 ## CloudBase Resource Ownership
 
@@ -70,8 +71,10 @@
 - CloudBase environment: `cloud1-d3g79qnvd808824c9`.
 - Canonical static hosting path: `/apps/ledger/`.
 - User-facing URL: `https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`.
+- API URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api`.
 - Root `/` is reserved for Rocky App 工厂 launcher; do not deploy Daily Bookkeeping to `/`.
-- Current source and online staging copy both use scoped service-worker/cache cleanup for the Daily Bookkeeping path.
+- Current source and online CloudBase copy both use scoped service-worker/cache cleanup for the Daily Bookkeeping path.
+- Verified 2026-07-02: API health, CORS preflight, register, save/read, two-account isolation, test-data cleanup, static `/apps/ledger/`, root launcher preservation, and Chrome page load with no console errors.
 - Service-worker rule: do not unregister or clear caches for the whole origin when sharing the CloudBase default domain with other apps.
 - Source of truth before any CloudBase work: `/Users/bytedance/Documents/Codex/cloudbase-deployment-registry.md`.
 

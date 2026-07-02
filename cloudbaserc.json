@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "envId": "cloud1-d3g79qnvd808824c9",
+  "functionRoot": "cloudfunctions",
+  "functions": [
+    {
+      "name": "daily-ledger-api",
+      "dir": "dailyLedgerApi",
+      "type": "HTTP",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 30,
+      "memorySize": 256,
+      "description": "Daily Ledger CloudBase H5 API"
+    }
+  ]
+}
