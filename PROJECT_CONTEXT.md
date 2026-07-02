@@ -66,12 +66,12 @@
 
 ## CloudBase Resource Ownership
 
-- Updated: 2026-06-30.
+- Updated: 2026-07-02.
 - CloudBase environment: `cloud1-d3g79qnvd808824c9`.
 - Canonical static hosting path: `/apps/ledger/`.
 - User-facing URL: `https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`.
 - Root `/` is reserved for Rocky App 工厂 launcher; do not deploy Daily Bookkeeping to `/`.
-- Current online staging copy has scoped service-worker cleanup, but the source project should be patched before the next CloudBase deploy.
+- Current source and online staging copy both use scoped service-worker/cache cleanup for the Daily Bookkeeping path.
 - Service-worker rule: do not unregister or clear caches for the whole origin when sharing the CloudBase default domain with other apps.
 - Source of truth before any CloudBase work: `/Users/bytedance/Documents/Codex/cloudbase-deployment-registry.md`.
 
@@ -117,4 +117,3 @@ Boundaries:
 - The design agent defines design DNA, audits UI/UX fit, and produces design recommendations.
 - The main product partner + CTO agent still decides priority, product scope, architecture, release, and whether implementation should start.
 - The design agent does not publish, merge, deploy, change databases, or change permissions by default.
-

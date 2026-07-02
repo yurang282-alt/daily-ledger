@@ -192,7 +192,8 @@ function bindEvents() {
   els.clearMonth.addEventListener("click", async () => {
     const monthRecords = getMonthRecords();
     if (!monthRecords.length) return;
-    if (!confirm(`确定清空 ${state.selectedMonth} 的 ${monthRecords.length} 笔记录吗？`)) return;
+    if (!confirm(`将清空 ${state.selectedMonth} 的 ${monthRecords.length} 笔记录。继续前会先下载当前账本备份，确定继续吗？`)) return;
+    downloadLedgerBackup(`before-clear-${state.selectedMonth}`);
     const snapshot = captureAppSnapshot();
     const month = state.selectedMonth;
     state.records = state.records.filter((record) => !record.date.startsWith(month));
@@ -490,11 +491,47 @@ async function signOut() {
 async function migrateLocalData() {
   if (!cloudStore || !state.user) return;
   const localData = localStore.readAll();
-  const saved = await commitStoreChange(() => cloudStore.saveAll(localData));
+  if (!hasLedgerContent(localData)) {
+    state.pendingMigration = false;
+    showNotice("这个浏览器没有需要合并的本地账本。", "info", 3000);
+    render();
+    return;
+  }
+
+  let cloudData;
+  try {
+    setSyncStatus("saving", "正在检查云端");
+    cloudData = await cloudStore.readAll();
+    setSyncStatus("cloud", "云端已连接");
+  } catch (error) {
+    console.error("Cloud preflight failed:", error);
+    setSyncStatus("error", "云端读取失败");
+    showNotice("云端读取失败，已取消合并，未改动数据。", "error");
+    return;
+  }
+
+  const summary = createMergeSummary(cloudData, localData);
+  const confirmed = confirm(
+    [
+      "这会把本地账本合并到云端，不会删除云端已有记录。",
+      `云端当前 ${summary.baseRecords} 笔，本地 ${summary.incomingRecords} 笔。`,
+      `预计新增 ${summary.newRecords} 笔，覆盖同 ID ${summary.overlapRecords} 笔。`,
+      "继续前会先下载当前云端账本备份，确定继续吗？",
+    ].join("\n"),
+  );
+  if (!confirmed) {
+    setSyncStatus("cloud", "云端已连接");
+    showNotice("已取消本地账本合并。", "info", 3000);
+    return;
+  }
+
+  downloadLedgerBackup("before-local-merge-to-cloud", cloudData);
+  const merged = mergeLedgerData(cloudData, localData);
+  const saved = await commitStoreChange(() => cloudStore.saveAll(merged), "本地账本已合并");
   if (!saved) return;
   state.pendingMigration = false;
   await reloadCloudData();
-  showNotice("本地账本已同步到云端。", "success");
+  showNotice("本地账本已合并到云端。", "success");
   render();
 }
 
@@ -566,7 +603,7 @@ function render() {
 
 function renderSyncNotice() {
   if (state.pendingMigration && state.mode === "cloud") {
-    els.syncMessage.textContent = "检测到这个浏览器里还有本地账本，可以同步到云端。";
+    els.syncMessage.textContent = "检测到这个浏览器里还有本地账本，可以合并到云端。";
     els.syncNotice.classList.remove("is-success", "is-error");
     els.migrateData.classList.remove("is-hidden");
     els.dismissMigration.classList.remove("is-hidden");
@@ -1054,18 +1091,9 @@ function shiftMonth(offset) {
 }
 
 function exportLedgerData() {
-  const data = createLedgerExport({
-    records: state.records,
-    categories: state.categories,
-    budget: state.budget,
-  });
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `daily-ledger-${toDateValue(new Date())}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
+  if (state.syncStatus === "error" && !confirm("当前云端同步异常。导出会保存当前页面里的账本数据，确定继续吗？")) return;
+  downloadLedgerBackup("manual-export");
+  showNotice("账本已导出。", "success", 3000);
 }
 
 async function importLedgerData() {
@@ -1074,8 +1102,21 @@ async function importLedgerData() {
 
   try {
     const snapshot = captureAppSnapshot();
+    const current = getCurrentLedgerData();
     const imported = parseLedgerImport(JSON.parse(await file.text()));
-    const merged = mergeLedgerData({ records: state.records, categories: state.categories, budget: state.budget }, imported);
+    const summary = createMergeSummary(current, imported);
+    const confirmed = confirm(
+      [
+        "导入会合并账本，不会自动删除当前已有记录。",
+        `当前 ${summary.baseRecords} 笔，导入文件 ${summary.incomingRecords} 笔。`,
+        `预计新增 ${summary.newRecords} 笔，覆盖同 ID ${summary.overlapRecords} 笔。`,
+        "继续前会先下载当前账本备份，确定导入吗？",
+      ].join("\n"),
+    );
+    if (!confirmed) return;
+
+    downloadLedgerBackup("before-import", current);
+    const merged = mergeLedgerData(current, imported);
     applyLedgerData(merged);
     render();
     const saved = await commitStoreChange(() => activeStore().saveAll(merged), "账本已导入");
@@ -1195,11 +1236,74 @@ function mergeLedgerData(base, incoming) {
   });
 }
 
-function createLedgerExport(data) {
+function getCurrentLedgerData() {
+  return normalizeLedgerData({
+    records: state.records,
+    categories: state.categories,
+    budget: state.budget,
+  });
+}
+
+function hasLedgerContent(data) {
+  const normalized = normalizeLedgerData(data);
+  const customExpenseCount = normalized.categories.expense.filter((item) => !DEFAULT_CATEGORIES.expense.includes(item)).length;
+  const customIncomeCount = normalized.categories.income.filter((item) => !DEFAULT_CATEGORIES.income.includes(item)).length;
+  return normalized.records.length > 0 || normalized.budget > 0 || customExpenseCount > 0 || customIncomeCount > 0;
+}
+
+function createMergeSummary(base, incoming) {
+  const baseData = normalizeLedgerData(base);
+  const incomingData = normalizeLedgerData(incoming);
+  const baseIds = new Set(baseData.records.map((record) => record.id));
+  const overlapRecords = incomingData.records.filter((record) => baseIds.has(record.id)).length;
+
+  return {
+    baseRecords: baseData.records.length,
+    incomingRecords: incomingData.records.length,
+    newRecords: incomingData.records.length - overlapRecords,
+    overlapRecords,
+  };
+}
+
+function downloadLedgerBackup(reason, data = getCurrentLedgerData()) {
+  const exported = createLedgerExport(data, { reason });
+  const blob = new Blob([JSON.stringify(exported, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = createLedgerBackupFilename(reason);
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function createLedgerBackupFilename(reason) {
+  const safeReason = String(reason || "backup")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `daily-ledger-${safeReason || "backup"}-${toDateValue(new Date())}.json`;
+}
+
+function createLedgerExport(data, meta = {}) {
+  const normalized = normalizeLedgerData(data);
   return {
     schemaVersion: LEDGER_EXPORT_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
     exportedAt: new Date().toISOString(),
-    ...normalizeLedgerData(data),
+    source: {
+      reason: meta.reason || "manual-export",
+      mode: state.mode,
+      syncStatus: state.syncStatus,
+      selectedMonth: state.selectedMonth,
+      path: window.location.pathname,
+    },
+    summary: {
+      records: normalized.records.length,
+      budget: normalized.budget,
+      expenseCategories: normalized.categories.expense.length,
+      incomeCategories: normalized.categories.income.length,
+    },
+    ...normalized,
   };
 }
 

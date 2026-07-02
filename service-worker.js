@@ -1,4 +1,5 @@
-const CACHE_PREFIX = "daily-ledger";
+const APP_SCOPE_PATH = new URL(self.registration.scope).pathname;
+const CACHE_PREFIX = `daily-ledger:${APP_SCOPE_PATH}`;
 
 self.addEventListener("install", () => {
   self.skipWaiting();

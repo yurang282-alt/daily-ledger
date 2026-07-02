@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Scoped service worker cleanup to the current app path so CloudBase `/apps/ledger/` does not affect other apps on the same default domain.
+- Changed local-to-cloud wording from sync to merge and added a preflight summary.
+- Added JSON backup downloads before importing, clearing a month, or merging local data to cloud.
+- Added source status and record summary metadata to exported ledger JSON.
+
 ## v0.2.0 - 2026-06-16
 
 Stable username login baseline.
