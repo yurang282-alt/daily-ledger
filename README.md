@@ -44,7 +44,8 @@ http://127.0.0.1:4173
 - 每日记账只部署到 `/apps/ledger/`。
 - 根目录 `/` 属于 Rocky App 工厂启动页，不部署每日记账。
 - 发布前必须确认 service worker 和 cache 清理只作用于当前 App 路径。
-- 当前主入口：`https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`。
+- 当前主入口：`https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/apps/ledger/`。
+- 静态托管备用入口：`https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`。
 - 当前 API：`https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api`。
 
 ## 部署到 Vercel

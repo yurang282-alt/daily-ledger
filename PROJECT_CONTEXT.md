@@ -70,7 +70,8 @@
 - Updated: 2026-07-02.
 - CloudBase environment: `cloud1-d3g79qnvd808824c9`.
 - Canonical static hosting path: `/apps/ledger/`.
-- User-facing URL: `https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`.
+- Primary user-facing URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/apps/ledger/`.
+- Static-hosting fallback URL: `https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`.
 - API URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api`.
 - Root `/` is reserved for Rocky App 工厂 launcher; do not deploy Daily Bookkeeping to `/`.
 - Current source and online CloudBase copy both use scoped service-worker/cache cleanup for the Daily Bookkeeping path.
