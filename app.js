@@ -1,4 +1,4 @@
-const APP_VERSION = "0.3.0";
+const APP_VERSION = "0.3.1";
 const STORAGE_KEY = "daily-ledger-records-v1";
 const CATEGORY_KEY = "daily-ledger-categories-v1";
 const BUDGET_KEY = "daily-ledger-budget-v1";
@@ -13,7 +13,7 @@ const DEFAULT_CATEGORIES = {
   income: ["工资", "副业", "投资", "红包", "其他"],
 };
 
-const CHART_COLORS = ["#315f9b", "#20785a", "#c17a19", "#7b5bb7", "#c7483c", "#4f7c86", "#9a6232", "#5d6d42"];
+const CHART_COLORS = ["#3e5c76", "#c47a2c", "#9b6a5c", "#7d8791", "#5f7184", "#b94a48", "#8b7355", "#53616d"];
 
 const localStore = createLocalStore();
 let cloudStore = null;

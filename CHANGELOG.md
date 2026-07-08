@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a ledger-trust visual refresh: warm paper surface, ink-first hierarchy, slate trust accents, amber budget progress, and non-green app icon/theme colors.
 - Migrated the active cloud backend from Supabase to CloudBase `daily-ledger-api`.
 - Added CloudBase username/password registration, login, password update, and signed session storage.
 - Added CloudBase ledger collections for users, records, categories, and settings with server-side owner scoping.

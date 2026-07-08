@@ -1748,3 +1748,337 @@ body {
     padding: 12px;
   }
 }
+
+/* Ledger trust visual pass: quiet personal ledger, not green fintech */
+:root {
+  --bg: #f7f3ea;
+  --surface: #fffdf8;
+  --surface-soft: #eee7dc;
+  --surface-raised: #fffaf1;
+  --text: #202124;
+  --muted: #6f6a60;
+  --line: #e4ddd0;
+  --green: #3e5c76;
+  --green-deep: #263a4d;
+  --green-soft: #e7eef4;
+  --red: #b94a48;
+  --red-soft: #f7e4e1;
+  --amber: #c47a2c;
+  --amber-soft: #fff1d8;
+  --blue: #3e5c76;
+  --blue-soft: #e7eef4;
+  --shadow: 0 16px 38px rgba(38, 58, 77, 0.1);
+  --shadow-soft: 0 8px 24px rgba(38, 58, 77, 0.07);
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(255, 250, 241, 0.96) 0, rgba(247, 243, 234, 0) 280px),
+    var(--bg);
+  color: var(--text);
+}
+
+.eyebrow,
+.plain-button {
+  color: var(--blue);
+}
+
+input:focus,
+select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(62, 92, 118, 0.14);
+}
+
+.status-pill,
+.status-pill.is-cloud {
+  border-color: var(--blue-soft);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.status-pill::before,
+.status-pill.is-cloud::before {
+  background: var(--blue);
+}
+
+.notice.is-success {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.metric,
+.home-recent-panel,
+.entry-panel,
+.analysis-panel,
+.list-panel,
+.chart-block,
+.auth-panel {
+  border-color: var(--line);
+  background: rgba(255, 253, 248, 0.94);
+  box-shadow: var(--shadow-soft);
+}
+
+.spending-metric {
+  position: relative;
+  overflow: hidden;
+  border-color: #d8ccba;
+  background:
+    linear-gradient(90deg, rgba(38, 58, 77, 0.05) 1px, transparent 1px) 0 0 / 100% 33%,
+    linear-gradient(180deg, #fffdf8 0%, #f8efe2 100%);
+  color: var(--text);
+  box-shadow: 0 18px 42px rgba(94, 73, 45, 0.11);
+}
+
+.spending-metric::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--blue);
+}
+
+.spending-metric span,
+.spending-metric small,
+.spending-heading span,
+.spending-budget-line span {
+  color: var(--muted);
+}
+
+.spending-heading strong,
+.spending-metric strong,
+.spending-metric > strong {
+  color: var(--text);
+}
+
+.spending-metric > strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.spending-budget-button {
+  border: 1px solid rgba(62, 92, 118, 0.22);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.progress-track,
+.spending-progress-track {
+  background: #e9dfd1;
+}
+
+.progress-track span,
+.spending-progress-track span {
+  background: var(--amber);
+}
+
+.progress-track span.is-warning,
+.spending-progress-track span.is-warning {
+  background: var(--amber);
+}
+
+.progress-track span.is-over,
+.spending-progress-track span.is-over {
+  background: var(--red);
+}
+
+.primary-button,
+.entry-panel .primary-button,
+.mobile-add-button,
+.segment.is-active {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0)),
+    var(--green-deep);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(38, 58, 77, 0.2);
+}
+
+.secondary-button,
+.voice-button,
+.voice-row {
+  border-color: rgba(62, 92, 118, 0.18);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.voice-row {
+  background: #fffdf8;
+}
+
+.voice-button.is-listening {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.quick-category {
+  border-color: var(--line);
+  background: #fffaf1;
+  color: var(--muted);
+}
+
+.quick-category.is-active {
+  border-color: rgba(62, 92, 118, 0.52);
+  background: var(--blue-soft);
+  color: var(--blue);
+  box-shadow: inset 0 0 0 1px rgba(62, 92, 118, 0.22);
+}
+
+.tag.income,
+.record-amount.income {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.bar {
+  background: var(--blue);
+}
+
+.delete-button:first-child {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+@media (max-width: 680px) {
+  body {
+    background:
+      radial-gradient(circle at 16% 0%, rgba(231, 238, 244, 0.82), rgba(247, 243, 234, 0) 34%),
+      linear-gradient(180deg, #fffcf6 0%, #f5efe5 100%);
+  }
+
+  .app-shell {
+    padding-top: max(18px, env(safe-area-inset-top));
+  }
+
+  .eyebrow {
+    color: var(--blue);
+  }
+
+  .status-pill {
+    background: var(--blue-soft);
+    color: var(--blue);
+  }
+
+  .auth-panel {
+    background: rgba(255, 253, 248, 0.9);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+
+  .month-switcher input,
+  .icon-button {
+    border-color: var(--line);
+    background: rgba(255, 253, 248, 0.92);
+    box-shadow: 0 8px 20px rgba(38, 58, 77, 0.06);
+  }
+
+  .spending-metric,
+  .spending-metric:first-of-type {
+    min-height: 188px;
+    border: 1px solid #d8ccba;
+    background:
+      linear-gradient(90deg, rgba(38, 58, 77, 0.055) 1px, transparent 1px) 0 0 / 100% 32%,
+      linear-gradient(180deg, #fffdf8 0%, #f8efe2 100%);
+    box-shadow: 0 18px 42px rgba(94, 73, 45, 0.12);
+  }
+
+  .spending-heading span,
+  .spending-budget-line span,
+  .spending-metric small {
+    color: var(--muted);
+  }
+
+  .spending-heading strong,
+  .spending-metric > strong {
+    color: var(--text);
+  }
+
+  .spending-progress-track {
+    background: #e9dfd1;
+  }
+
+  .spending-progress-track span {
+    background: var(--amber);
+  }
+
+  .spending-budget-button {
+    background: var(--blue-soft);
+    color: var(--blue);
+  }
+
+  .home-recent-panel,
+  .entry-panel,
+  .analysis-panel,
+  .list-panel,
+  .metric,
+  .chart-block {
+    border-color: var(--line);
+    background: rgba(255, 253, 248, 0.94);
+    box-shadow: 0 14px 34px rgba(94, 73, 45, 0.08);
+  }
+
+  #amountInput {
+    color: var(--text);
+    border-bottom-color: var(--line);
+  }
+
+  .quick-category {
+    border-color: var(--line);
+    background: #fffaf1;
+    color: var(--muted);
+    box-shadow: 0 8px 18px rgba(94, 73, 45, 0.04);
+  }
+
+  .quick-category.is-active {
+    border-color: rgba(62, 92, 118, 0.55);
+    background: var(--blue-soft);
+    color: var(--blue);
+    box-shadow: inset 0 0 0 1px rgba(62, 92, 118, 0.22);
+  }
+
+  .voice-row {
+    border-color: var(--line);
+    background: #fffdf8;
+    color: var(--blue);
+  }
+
+  .entry-panel .primary-button {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0)),
+      var(--green-deep);
+    box-shadow: 0 14px 28px rgba(38, 58, 77, 0.2);
+  }
+
+  .mobile-add-button {
+    background: var(--green-deep);
+    box-shadow: 0 15px 32px rgba(38, 58, 77, 0.28);
+  }
+
+  .mobile-tabbar {
+    border-color: rgba(228, 221, 208, 0.95);
+    background: rgba(255, 253, 248, 0.94);
+    box-shadow: 0 -12px 38px rgba(94, 73, 45, 0.12);
+  }
+
+  .mobile-tabbar button.is-active,
+  .mobile-tabbar button.is-active:not([data-mobile-view="record"]) {
+    background: transparent;
+    color: var(--blue);
+  }
+
+  .mobile-tabbar button.is-active:not([data-mobile-view="record"]) svg {
+    color: var(--blue);
+  }
+
+  .mobile-chart-tabs {
+    border-color: var(--line);
+    background: #fffaf1;
+  }
+
+  .segment.is-active {
+    background: var(--green-deep);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(38, 58, 77, 0.18);
+  }
+
+  .insight-grid article {
+    border-color: var(--line);
+    background: #fffdf8;
+  }
+}

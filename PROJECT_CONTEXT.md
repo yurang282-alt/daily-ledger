@@ -21,7 +21,7 @@
 ## Current Status
 
 - Stage: Usable static mobile web/PWA with local ledger and verified CloudBase API sync.
-- Working version: `v0.3.0` uses CloudBase `daily-ledger-api` for active cloud auth/data, while keeping local ledger, username/password login, password change, local-to-cloud merge prompt, rollback on failed cloud write, JSON export schema version, and PWA installation.
+- Working version: `v0.3.1` uses CloudBase `daily-ledger-api` for active cloud auth/data, while keeping local ledger, username/password login, password change, local-to-cloud merge prompt, rollback on failed cloud write, JSON export schema version, PWA installation, and a non-green ledger-trust visual refresh.
 - Local state: Open `index.html` directly or serve locally at `http://127.0.0.1:4173`.
 - GitHub state: `main` and `codex/username-password-auth` pointed to `14acc2d Replace email OTP with username password auth` before version-management changes.
 - Deployment state: CloudBase `/apps/ledger/` is the primary production path; Vercel remains an optional mirror.
@@ -42,6 +42,8 @@
 - Rejected paths: Do not add bank automation, investments, family sharing, or complex accounting before data correctness, privacy, export, and recovery are strong.
 - Why: Personal finance data needs reliability and privacy more than feature breadth. CloudBase removes the VPN dependency while keeping the PWA surface and JSON backup path.
 - Revisit trigger: Before exposing to friends, moving to Mini Program, adding recurring records, or changing backend.
+- Design priority: Treat "trust design" as a core product requirement, not polish. Daily Bookkeeping should feel like a reliable personal ledger: clear amount hierarchy, visible sync state, visible backup/export/recovery paths, and conservative error recovery. It should not become a flashy fintech dashboard.
+- CTO gate: Any UI change that implies cloud save status, backup, restore, export, deletion safety, account isolation, or data recovery must wait for CTO-level validation of data reliability, owner scoping, and export/restore behavior before implementation.
 
 ## Risks
 
@@ -53,6 +55,7 @@
 ## Next Actions
 
 - Now: Use the CloudBase URL on phone and desktop with a real account, then export a JSON backup after the first real records are confirmed.
+- Design backlog: Add L2 trust design work after the data reliability checks are confirmed: data status feedback, export/recovery visibility, save/error feedback, and ledger-like amount hierarchy.
 - Later: Run a controlled Supabase-to-CloudBase data migration using JSON export/import only if old Supabase records still matter, then decide whether Supabase can be retired.
 - Blocked: Existing Supabase data should not be deleted until the user confirms real CloudBase records and backup/restore are correct.
 
@@ -75,7 +78,7 @@
 - API URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api`.
 - Root `/` is reserved for Rocky App 工厂 launcher; do not deploy Daily Bookkeeping to `/`.
 - Current source and online CloudBase copy both use scoped service-worker/cache cleanup for the Daily Bookkeeping path.
-- Verified 2026-07-02: API health, CORS preflight, register, save/read, two-account isolation, test-data cleanup, static `/apps/ledger/`, root launcher preservation, and Chrome page load with no console errors.
+- Verified 2026-07-08: static `/apps/ledger/` visual refresh source, local mobile/desktop page load, and no browser console errors. Verified 2026-07-02: API health, CORS preflight, register, save/read, two-account isolation, test-data cleanup, static `/apps/ledger/`, root launcher preservation, and Chrome page load with no console errors.
 - Service-worker rule: do not unregister or clear caches for the whole origin when sharing the CloudBase default domain with other apps.
 - Source of truth before any CloudBase work: `/Users/bytedance/Documents/Codex/cloudbase-deployment-registry.md`.
 
@@ -112,9 +115,10 @@ This project's design DNA:
 
 - Product identity: Personal ledger for fast income/expense recording.
 - Desired feeling: Reliable, quiet, low-friction, financially clear.
-- Design direction: Ledger-like structure, strong amount hierarchy, compact mobile entry, sober colors.
+- Design direction: Trust-first ledger structure, strong amount hierarchy, compact mobile entry, visible data state, sober non-fintech colors.
 - Avoid: Flashy fintech dashboard, decorative charts before data is reliable.
 - First design focus: Make record, review, export, and recovery feel trustworthy.
+- Portfolio contrast: Unlike Healthy Pro / Rocky, this is not a training cockpit with performance pressure. Unlike AI4Travel, this is not exploratory or optimistic. Unlike AI4EN, this is not a high-stakes rehearsal surface. Daily Bookkeeping should be calmer, more private, and more ledger-like than all three.
 
 Boundaries:
 
