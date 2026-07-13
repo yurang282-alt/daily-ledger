@@ -94,7 +94,7 @@
 - API URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api`.
 - Root `/` is reserved for Rocky App 工厂 launcher; do not deploy Daily Bookkeeping to `/`.
 - Current source and online CloudBase copy both use scoped service-worker/cache cleanup for the Daily Bookkeeping path.
-- Verified 2026-07-08: static `/apps/ledger/` visual refresh source, local mobile/desktop page load, and no browser console errors. Verified 2026-07-02: API health, CORS preflight, register, save/read, two-account isolation, test-data cleanup, static `/apps/ledger/`, root launcher preservation, and Chrome page load with no console errors.
+- Verified 2026-07-13: released `v0.3.2` to static `/apps/ledger/`; the exact formal `https://rocky4ai.com/apps/ledger/` entry loaded the versioned CSS at desktop and `390 x 844` mobile widths with no horizontal overflow, broken images, or browser console errors. Mobile history/backup entry and root launcher preservation were also verified. Verified 2026-07-02: API health, CORS preflight, register, save/read, two-account isolation, test-data cleanup, static `/apps/ledger/`, root launcher preservation, and Chrome page load with no console errors.
 - Service-worker rule: do not unregister or clear caches for the whole origin when sharing the CloudBase default domain with other apps.
 - Source of truth before any CloudBase work: `/Users/bytedance/Documents/Codex/cloudbase-deployment-registry.md`.
 
