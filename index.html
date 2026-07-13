@@ -8,12 +8,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="每日收支" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="app-version" content="0.3.1" />
+    <meta name="app-version" content="0.3.2" />
     <title>每日收支</title>
     <link rel="manifest" href="./manifest.json" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./icon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260708-ledger-trust" />
+    <link rel="stylesheet" href="./styles.css?v=20260713-dual-surface-qa" />
   </head>
   <body class="mobile-view-home mobile-chart-category">
     <main class="app-shell">
@@ -81,7 +81,10 @@
       <section class="home-recent-panel">
         <div class="panel-title">
           <h2>最近记录</h2>
-          <span id="homeRecordCount">0 笔</span>
+          <div class="home-recent-actions">
+            <span id="homeRecordCount">0 笔</span>
+            <button class="plain-button" id="openMobileHistory" type="button" data-mobile-view-target="history">全部</button>
+          </div>
         </div>
         <div class="records records--compact" id="homeRecentList"></div>
       </section>
@@ -233,7 +236,7 @@
     </nav>
 
     <script src="./config.js?v=20260708-ledger-trust"></script>
-    <script src="./app.js?v=20260708-ledger-trust"></script>
+    <script src="./app.js?v=20260713-dual-surface-qa"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", async () => {

@@ -1,4 +1,4 @@
-const APP_VERSION = "0.3.1";
+const APP_VERSION = "0.3.2";
 const STORAGE_KEY = "daily-ledger-records-v1";
 const CATEGORY_KEY = "daily-ledger-categories-v1";
 const BUDGET_KEY = "daily-ledger-budget-v1";
@@ -971,7 +971,7 @@ function editRecord(id) {
 }
 
 function switchMobileView(view) {
-  if (!["home", "record", "stats"].includes(view)) return;
+  if (!["home", "record", "stats", "history"].includes(view)) return;
   state.mobileView = view;
   renderMobileView();
   if (window.matchMedia("(max-width: 680px)").matches) {
@@ -983,16 +983,22 @@ function renderMobileView() {
   document.body.classList.toggle("mobile-view-home", state.mobileView === "home");
   document.body.classList.toggle("mobile-view-record", state.mobileView === "record");
   document.body.classList.toggle("mobile-view-stats", state.mobileView === "stats");
+  document.body.classList.toggle("mobile-view-history", state.mobileView === "history");
   const titles = {
     home: "每日收支",
     record: "记一笔",
     stats: "统计",
+    history: "收支明细",
   };
   if (els.pageTitle) {
     els.pageTitle.textContent = titles[state.mobileView] || "每日收支";
   }
   document.querySelectorAll("[data-mobile-view]").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.mobileView === state.mobileView);
+    button.classList.toggle(
+      "is-active",
+      button.dataset.mobileView === state.mobileView
+        || (state.mobileView === "history" && button.dataset.mobileView === "home"),
+    );
   });
 }
 

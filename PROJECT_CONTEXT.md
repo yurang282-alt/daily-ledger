@@ -21,11 +21,26 @@
 ## Current Status
 
 - Stage: Usable static mobile web/PWA with local ledger and verified CloudBase API sync.
-- Working version: `v0.3.1` uses CloudBase `daily-ledger-api` for active cloud auth/data, while keeping local ledger, username/password login, password change, local-to-cloud merge prompt, rollback on failed cloud write, JSON export schema version, PWA installation, and a non-green ledger-trust visual refresh.
+- Working version: `v0.3.2` uses CloudBase `daily-ledger-api` for active cloud auth/data, while keeping local ledger, username/password login, password change, local-to-cloud merge prompt, rollback on failed cloud write, JSON export schema version, PWA installation, responsive desktop workspace, and mobile history/backup entry.
 - Local state: Open `index.html` directly or serve locally at `http://127.0.0.1:4173`.
 - GitHub state: `main` and `codex/username-password-auth` pointed to `14acc2d Replace email OTP with username password auth` before version-management changes.
 - Deployment state: CloudBase `/apps/ledger/` is the primary production path; Vercel remains an optional mirror.
 - In-app/release state: `VERSION`, `CHANGELOG.md`, Git tags, and a static app-version meta tag track stable releases.
+
+## Rocky4AI Official Entry And Release Boundary
+
+- Updated: 2026-07-12.
+- Rocky4AI formal domain is live with ICP filing, HTTPS certificate, and CloudBase binding.
+- Formal root entry: `https://rocky4ai.com/`.
+- CloudBase environment ID: `cloud1-d3g79qnvd808824c9`.
+- Root `/` is owned only by `app-factory`; the current root entry goes to LifeMap. Daily Bookkeeping and other ordinary apps must never publish to `/`.
+- Daily Bookkeeping formal entry: `https://rocky4ai.com/apps/ledger/`.
+- Daily Bookkeeping CloudBase path: `/apps/ledger/`.
+- CloudBase default domains, test domains, and `localhost` are for development or evidence only; they must not be handed to users as the formal product entry.
+- Web internal navigation should prefer same-origin relative paths such as `/apps/<app-name>/`; do not hard-code CloudBase test domains or invent DNS subdomains inside this project.
+- Unified domain does not mean unified accounts, databases, or user data. Do not add shared identity, shared data, or cross-app sync just because the domain is unified.
+- DNS, certificates, domain binding, and root publishing are owned by CTO / `app-factory`; this project must not modify them.
+- Every future release must distinguish local files, Git, remote `main`, deployment, and user-visible version, then verify the exact `https://rocky4ai.com/apps/ledger/` entry.
 
 ## Architecture
 
@@ -73,7 +88,8 @@
 - Updated: 2026-07-02.
 - CloudBase environment: `cloud1-d3g79qnvd808824c9`.
 - Canonical static hosting path: `/apps/ledger/`.
-- Primary user-facing URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/apps/ledger/`.
+- Formal user-facing URL: `https://rocky4ai.com/apps/ledger/`.
+- CloudBase development/evidence URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/apps/ledger/`.
 - Static-hosting fallback URL: `https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`.
 - API URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api`.
 - Root `/` is reserved for Rocky App 工厂 launcher; do not deploy Daily Bookkeeping to `/`.

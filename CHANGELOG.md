@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## v0.3.2 - 2026-07-13
+
+- Refined the desktop workspace: stable one-line title, balanced monthly overview cards, and readable empty chart state.
+- Added a mobile "全部" entry from recent records to a dedicated history and backup screen with export/import controls.
+- Versioned updated CSS and JavaScript asset URLs so installed and browser clients receive this release's interface changes.
+
+Verification:
+
+- Browser QA at `1440 x 900` and `390 x 844`: no horizontal overflow, broken images, or console errors.
+- Verified desktop entry, analysis, history, export/import visibility; verified mobile home, record, statistics, and history/backup entry flow.
+
+## v0.3.1 - 2026-07-08
 
 - Added a ledger-trust visual refresh: warm paper surface, ink-first hierarchy, slate trust accents, amber budget progress, and non-green app icon/theme colors.
 - Migrated the active cloud backend from Supabase to CloudBase `daily-ledger-api`.

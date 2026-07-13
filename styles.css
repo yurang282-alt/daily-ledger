@@ -136,7 +136,7 @@ button {
 }
 
 .auth-panel input {
-  width: 180px;
+  width: 128px;
   min-height: 34px;
   border: 0;
   padding: 6px 8px;
@@ -271,7 +271,7 @@ select:focus {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -296,6 +296,12 @@ select:focus {
 .home-recent-panel,
 .mobile-tabbar {
   display: none;
+}
+
+.home-recent-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .metric span,
@@ -517,6 +523,12 @@ label {
   font-size: 14px;
 }
 
+.legend .empty-state {
+  display: block;
+  grid-column: 1 / -1;
+  text-align: center;
+}
+
 .legend b {
   overflow: hidden;
   color: var(--text);
@@ -701,6 +713,32 @@ dialog::backdrop {
 .dialog-actions .primary-button,
 .dialog-actions .secondary-button {
   width: auto;
+}
+
+@media (min-width: 681px) {
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .topbar > :first-child {
+    flex: 0 0 210px;
+  }
+
+  #pageTitle {
+    white-space: nowrap;
+  }
+
+  .top-actions {
+    flex: 1;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .month-switcher {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
 }
 
 @media (max-width: 920px) {
@@ -958,7 +996,10 @@ body {
   body.mobile-view-stats .summary-grid,
   body.mobile-view-stats .home-recent-panel,
   body.mobile-view-stats .entry-panel,
-  body.mobile-view-stats .list-panel {
+  body.mobile-view-stats .list-panel,
+  body.mobile-view-history .summary-grid,
+  body.mobile-view-history .home-recent-panel,
+  body.mobile-view-history .workspace {
     display: none;
   }
 
@@ -1322,6 +1363,10 @@ body {
   }
 
   body.mobile-view-record .mobile-add-button {
+    display: none;
+  }
+
+  body.mobile-view-history .mobile-add-button {
     display: none;
   }
 
