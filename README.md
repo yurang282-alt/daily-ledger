@@ -2,7 +2,7 @@
 
 一个手机优先的极简记账网页 App，支持本地账本和 CloudBase 云端同步。
 
-当前稳定版本：`v0.3.2`
+当前稳定版本：`v0.3.3`
 
 ## 本地使用
 
@@ -44,8 +44,8 @@ http://127.0.0.1:4173
 - 每日记账只部署到 `/apps/ledger/`。
 - 根目录 `/` 属于 Rocky App 工厂启动页，不部署每日记账。
 - 发布前必须确认 service worker 和 cache 清理只作用于当前 App 路径。
-- 当前主入口：`https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/apps/ledger/`。
-- 静态托管备用入口：`https://cloud1-d3g79qnvd808824c9-1444897143.tcloudbaseapp.com/apps/ledger/index.html`。
+- 正式主入口：`https://rocky4ai.com/apps/ledger/`。
+- CloudBase HTTP 服务域名和静态托管备用入口仅用于开发或故障证据，不作为交给用户的正式链接。
 - 当前 API：`https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api`。
 
 ## 部署到 Vercel
@@ -62,6 +62,6 @@ Android 用 Chrome 打开线上地址，点菜单，然后选择“安装应用�
 
 - `VERSION` 保存当前稳定版本号。
 - `CHANGELOG.md` 记录每个稳定版本的用户可见变化、验证结果和已知限制。
-- 稳定版本用 Git tag 标记，例如 `v0.3.0`。
+- 稳定版本用 Git tag 标记，例如 `v0.3.3`。
 - 小改动验证通过后可以直接进 `main`；登录、同步、数据库、数据迁移这类高风险改动先走分支。
 - 线上版本以 GitHub `main` + CloudBase `/apps/ledger/` 发布结果为准，本地文件和本地预览不等于用户可见版本。

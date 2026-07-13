@@ -1,4 +1,4 @@
-const APP_VERSION = "0.3.2";
+const APP_VERSION = "0.3.3";
 const STORAGE_KEY = "daily-ledger-records-v1";
 const CATEGORY_KEY = "daily-ledger-categories-v1";
 const BUDGET_KEY = "daily-ledger-budget-v1";

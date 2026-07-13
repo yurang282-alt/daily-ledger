@@ -21,9 +21,9 @@
 ## Current Status
 
 - Stage: Usable static mobile web/PWA with local ledger and verified CloudBase API sync.
-- Working version: `v0.3.2` uses CloudBase `daily-ledger-api` for active cloud auth/data, while keeping local ledger, username/password login, password change, local-to-cloud merge prompt, rollback on failed cloud write, JSON export schema version, PWA installation, responsive desktop workspace, and mobile history/backup entry.
+- Working version: `v0.3.3` uses CloudBase `daily-ledger-api` for active cloud auth/data, while keeping local ledger, username/password login, password change, local-to-cloud merge prompt, rollback on failed cloud write, JSON export schema version, PWA installation, responsive desktop workspace, and mobile history/backup entry.
 - Local state: Open `index.html` directly or serve locally at `http://127.0.0.1:4173`.
-- GitHub state: `main` and `codex/username-password-auth` pointed to `14acc2d Replace email OTP with username password auth` before version-management changes.
+- GitHub state: `main` is the release branch; use `git log -1 --oneline` for the current immutable commit reference. `codex/username-password-auth` remains historical context only.
 - Deployment state: CloudBase `/apps/ledger/` is the primary production path; Vercel remains an optional mirror.
 - In-app/release state: `VERSION`, `CHANGELOG.md`, Git tags, and a static app-version meta tag track stable releases.
 
@@ -69,7 +69,7 @@
 
 ## Next Actions
 
-- Now: Use the CloudBase URL on phone and desktop with a real account, then export a JSON backup after the first real records are confirmed.
+- Now: Use the formal `https://rocky4ai.com/apps/ledger/` entry on phone and desktop with a real account, then export a JSON backup after the first real records are confirmed.
 - Design backlog: Add L2 trust design work after the data reliability checks are confirmed: data status feedback, export/recovery visibility, save/error feedback, and ledger-like amount hierarchy.
 - Later: Run a controlled Supabase-to-CloudBase data migration using JSON export/import only if old Supabase records still matter, then decide whether Supabase can be retired.
 - Blocked: Existing Supabase data should not be deleted until the user confirms real CloudBase records and backup/restore are correct.
@@ -85,7 +85,7 @@
 
 ## CloudBase Resource Ownership
 
-- Updated: 2026-07-02.
+- Updated: 2026-07-13.
 - CloudBase environment: `cloud1-d3g79qnvd808824c9`.
 - Canonical static hosting path: `/apps/ledger/`.
 - Formal user-facing URL: `https://rocky4ai.com/apps/ledger/`.
@@ -94,7 +94,7 @@
 - API URL: `https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api`.
 - Root `/` is reserved for Rocky App 工厂 launcher; do not deploy Daily Bookkeeping to `/`.
 - Current source and online CloudBase copy both use scoped service-worker/cache cleanup for the Daily Bookkeeping path.
-- Verified 2026-07-13: released `v0.3.2` to static `/apps/ledger/`; the exact formal `https://rocky4ai.com/apps/ledger/` entry loaded the versioned CSS at desktop and `390 x 844` mobile widths with no horizontal overflow, broken images, or browser console errors. Mobile history/backup entry and root launcher preservation were also verified. Verified 2026-07-02: API health, CORS preflight, register, save/read, two-account isolation, test-data cleanup, static `/apps/ledger/`, root launcher preservation, and Chrome page load with no console errors.
+- Verified 2026-07-13: released `v0.3.2` to static `/apps/ledger/`; `v0.3.3` is the approved mobile accessibility patch, with `44 x 44` history action targets and secondary-text contrast of `7.01:1`. The exact formal `https://rocky4ai.com/apps/ledger/` entry is the only user-facing production check. Verified 2026-07-02: API health, CORS preflight, register, save/read, two-account isolation, test-data cleanup, static `/apps/ledger/`, root launcher preservation, and Chrome page load with no console errors.
 - Service-worker rule: do not unregister or clear caches for the whole origin when sharing the CloudBase default domain with other apps.
 - Source of truth before any CloudBase work: `/Users/bytedance/Documents/Codex/cloudbase-deployment-registry.md`.
 

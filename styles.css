@@ -463,6 +463,14 @@ label {
   justify-content: flex-end;
 }
 
+.list-actions .plain-button {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .charts-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -1801,7 +1809,7 @@ body {
   --surface-soft: #eee7dc;
   --surface-raised: #fffaf1;
   --text: #202124;
-  --muted: #6f6a60;
+  --muted: #5c574e;
   --line: #e4ddd0;
   --green: #3e5c76;
   --green-deep: #263a4d;

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.3 - 2026-07-13
+
+- Improved mobile accessibility: non-primary text now has stronger contrast, and history export/import controls meet the 44px touch-target baseline.
+- Kept the formal Rocky4AI entry and CloudBase release boundary explicit in project documentation.
+
+Verification:
+
+- Local mobile history QA at `390 x 844`: no horizontal overflow or console errors; export/import controls are `44 x 44` and secondary text contrast is `7.01:1` on white.
+- Independent design review passed for the actual desktop workspace and mobile-first flows.
+
 ## v0.3.2 - 2026-07-13
 
 - Refined the desktop workspace: stable one-line title, balanced monthly overview cards, and readable empty chart state.
