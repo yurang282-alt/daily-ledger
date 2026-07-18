@@ -237,38 +237,6 @@
 
     <script src="./config.js?v=20260708-ledger-trust"></script>
     <script src="./app.js?v=20260713-dual-surface-qa"></script>
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", async () => {
-          try {
-            const appBasePath = new URL(".", window.location.href).pathname;
-            const isSharedCloudBaseHost = window.location.hostname.endsWith(".tcloudbaseapp.com");
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            const appRegistrations = registrations.filter((registration) => {
-              const scopePath = new URL(registration.scope).pathname;
-              if (isSharedCloudBaseHost && appBasePath === "/") return false;
-              return scopePath.startsWith(appBasePath);
-            });
-            await Promise.all(appRegistrations.map((registration) => registration.unregister()));
-            if (window.caches) {
-              const keys = await caches.keys();
-              const scopedCachePrefix = `daily-ledger:${appBasePath}`;
-              const isOwnedCache = (key) => (
-                isSharedCloudBaseHost
-                  ? key.startsWith(scopedCachePrefix)
-                  : key === "daily-ledger" || key.startsWith("daily-ledger-") || key.startsWith(scopedCachePrefix)
-              );
-              await Promise.all(
-                keys
-                  .filter(isOwnedCache)
-                  .map((key) => caches.delete(key)),
-              );
-            }
-          } catch (error) {
-            console.warn("Daily Ledger cache cleanup failed:", error);
-          }
-        });
-      }
-    </script>
+    <script src="./security-cleanup.js?v=20260718-origin-security-v1"></script>
   </body>
 </html>
