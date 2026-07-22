@@ -1,10 +1,10 @@
-const APP_VERSION = "0.3.3";
-const STORAGE_KEY = "daily-ledger-records-v1";
-const CATEGORY_KEY = "daily-ledger-categories-v1";
-const BUDGET_KEY = "daily-ledger-budget-v1";
-const AUTH_STORAGE_KEY = "daily-ledger-cloudbase-session";
+const APP_VERSION = "0.4.0-sso";
+const STORAGE_PREFIX = window.ROCKY_STORAGE_PREFIX || "";
+const STORAGE_KEY = `${STORAGE_PREFIX}daily-ledger-records-v1`;
+const CATEGORY_KEY = `${STORAGE_PREFIX}daily-ledger-categories-v1`;
+const BUDGET_KEY = `${STORAGE_PREFIX}daily-ledger-budget-v1`;
 const LEDGER_EXPORT_SCHEMA_VERSION = 1;
-const DEFAULT_CLOUDBASE_API_BASE = "https://cloud1-d3g79qnvd808824c9-1444897143.ap-shanghai.app.tcloudbase.com/daily-ledger-api";
+const DEFAULT_CLOUDBASE_API_BASE = "/daily-ledger-api";
 
 window.__dailyLedgerVersion = APP_VERSION;
 
@@ -201,19 +201,6 @@ function bindEvents() {
     if (!saved) restoreAppSnapshot(snapshot);
   });
 
-  els.passwordLogin?.addEventListener("click", signInWithPassword);
-  els.registerAccount?.addEventListener("click", registerWithPassword);
-  els.savePassword?.addEventListener("click", updatePassword);
-  els.authAccount?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    els.authPassword?.focus();
-  });
-  els.authPassword?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    state.user ? updatePassword() : signInWithPassword();
-  });
   els.signOut.addEventListener("click", signOut);
   els.migrateData.addEventListener("click", migrateLocalData);
   els.dismissMigration.addEventListener("click", () => {
@@ -251,17 +238,13 @@ async function setupCloudStore() {
   try {
     cloudApiClient = createCloudbaseApiClient(config);
     cloudStore = createCloudStore(cloudApiClient);
-    const session = cloudApiClient.getSession();
-
-    if (session?.token) {
-      state.user = await cloudApiClient.me();
-      state.mode = "cloud";
-      state.syncStatus = "cloud";
-      state.pendingMigration = hasLocalData();
-    }
+    state.user = await cloudApiClient.me();
+    state.mode = "cloud";
+    state.syncStatus = "cloud";
+    // Historical unscoped data is deliberately frozen; it is never auto-merged.
+    state.pendingMigration = false;
   } catch (error) {
     console.warn("Cloud setup failed:", error);
-    cloudApiClient?.clearSession();
     state.mode = "local";
     state.user = null;
     state.syncStatus = "error";
@@ -282,9 +265,6 @@ async function safeReloadCloudData() {
     await reloadCloudData();
   } catch (error) {
     console.error("Cloud load failed:", error);
-    if (error.status === 401) {
-      cloudApiClient?.clearSession();
-    }
     state.mode = "local";
     state.user = null;
     state.pendingMigration = false;
@@ -294,145 +274,9 @@ async function safeReloadCloudData() {
   }
 }
 
-async function readAuthCredentials() {
-  const rawAccount = els.authAccount?.value.trim() || "";
-  const password = els.authPassword?.value || "";
-  const account = normalizeAuthAccount(rawAccount);
-
-  if (!account) {
-    els.authAccount?.focus();
-    showNotice("账号名 2-32 位，可用中文、字母、数字、下划线或短横线。", "error");
-    return null;
-  }
-
-  if (!password || password.length < 6) {
-    els.authPassword?.focus();
-    showNotice("密码至少 6 位。", "error");
-    return null;
-  }
-
-  return {
-    account,
-    password,
-  };
-}
-
-function normalizeAuthAccount(value) {
-  const account = value.trim().toLowerCase();
-  if (isValidEmail(account)) return account;
-  if (!/^[\p{L}\p{N}_-]{2,32}$/u.test(account)) return "";
-  return account;
-}
-
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-async function signInWithPassword() {
-  if (!cloudApiClient) {
-    alert("请先在 config.js 填入 CloudBase API 配置。");
-    return;
-  }
-
-  const credentials = await readAuthCredentials();
-  if (!credentials) return;
-
-  els.passwordLogin.disabled = true;
-  els.passwordLogin.textContent = "登录中";
-
-  try {
-    const session = await cloudApiClient.login(credentials.account, credentials.password);
-    await applyCloudSession(session);
-    els.authPassword.value = "";
-    showNotice("登录成功，正在同步云端数据。", "success", 3000);
-  } catch (error) {
-    showNotice(`登录失败：${error.message}`, "error");
-  } finally {
-    els.passwordLogin.disabled = false;
-    els.passwordLogin.textContent = "登录";
-  }
-}
-
-async function registerWithPassword() {
-  if (!cloudApiClient) {
-    alert("请先在 config.js 填入 CloudBase API 配置。");
-    return;
-  }
-
-  const credentials = await readAuthCredentials();
-  if (!credentials) return;
-
-  els.registerAccount.disabled = true;
-  els.registerAccount.textContent = "注册中";
-
-  try {
-    const session = await cloudApiClient.register(credentials.account, credentials.password);
-    await applyCloudSession(session);
-    els.authPassword.value = "";
-    showNotice("注册成功，正在同步云端数据。", "success", 3000);
-  } catch (error) {
-    showNotice(`注册失败：${error.message}`, "error");
-  } finally {
-    els.registerAccount.disabled = false;
-    els.registerAccount.textContent = "注册";
-  }
-}
-
-async function updatePassword() {
-  if (!cloudApiClient) {
-    alert("请先在 config.js 填入 CloudBase API 配置。");
-    return;
-  }
-
-  const password = els.authPassword?.value || "";
-  if (!password || password.length < 6) {
-    els.authPassword?.focus();
-    return;
-  }
-
-  els.savePassword.disabled = true;
-  els.savePassword.textContent = "保存中";
-
-  try {
-    await cloudApiClient.updatePassword(password);
-    els.authPassword.value = "";
-    showNotice("密码已更新。以后直接用账号名和密码登录。", "success");
-  } catch (error) {
-    showNotice(`密码设置失败：${error.message}`, "error");
-  } finally {
-    els.savePassword.disabled = false;
-    els.savePassword.textContent = "设置/更改密码";
-  }
-}
-
-async function applyCloudSession(session) {
-  cloudApiClient.setSession(session);
-  state.user = {
-    id: session.ownerId,
-    ownerId: session.ownerId,
-    accountName: session.accountName,
-  };
-  cloudStore = createCloudStore(cloudApiClient);
-  state.mode = "cloud";
-  state.syncStatus = "cloud";
-  state.pendingMigration = hasLocalData();
-  setSyncStatus("saving", "正在读取云端");
-  await reloadCloudData();
-  updateAuthUI();
-  render();
-}
-
 async function signOut() {
-  cloudApiClient?.clearSession();
-  state.mode = "local";
-  state.user = null;
-  state.pendingMigration = false;
-  state.syncMessage = "";
-  state.syncStatus = "local";
-  applyLedgerData(localStore.readAll());
-  updateAuthUI();
-  showNotice("已退出云端账号，当前使用本地账本。", "info");
-  render();
+  if (!window.RockyAppIdentity) return;
+  await window.RockyAppIdentity.logout();
 }
 
 async function migrateLocalData() {
@@ -576,17 +420,8 @@ function updateAuthUI() {
   const configured = Boolean(getCloudbaseConfig());
   els.modeLabel.textContent = state.mode === "cloud" ? "云端同步" : "本地记账";
   els.authPanel.classList.toggle("is-hidden", !configured);
-  els.authAccount?.classList.toggle("is-hidden", !configured || state.user);
-  els.authPassword?.classList.toggle("is-hidden", !configured);
-  els.passwordLogin?.classList.toggle("is-hidden", !configured || state.user);
-  els.registerAccount?.classList.toggle("is-hidden", !configured || state.user);
-  els.savePassword?.classList.toggle("is-hidden", !configured || !state.user);
-  els.signOut.classList.toggle("is-hidden", !configured || !state.user);
-  els.signOut.textContent = "退出登录";
-  if (els.authPassword) {
-    els.authPassword.placeholder = state.user ? "新密码（至少 6 位）" : "密码";
-    els.authPassword.autocomplete = state.user ? "new-password" : "current-password";
-  }
+  els.signOut.classList.toggle("is-hidden", !configured);
+  els.signOut.textContent = "退出 Rocky 账号";
   renderStatusPill();
 }
 
@@ -1380,28 +1215,16 @@ function getCloudbaseConfig() {
 function createCloudbaseApiClient(config) {
   const apiBase = config.cloudbaseApiBase;
   return {
-    getSession() {
-      return loadJSON(AUTH_STORAGE_KEY, null);
-    },
-    setSession(session) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-    },
-    clearSession() {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    },
     async request(method, path, body) {
-      const session = this.getSession();
       const headers = {
         "content-type": "application/json",
       };
-      if (session?.token) {
-        headers["x-daily-ledger-session"] = session.token;
-      }
       const response = await fetch(`${apiBase}${path}`, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
         cache: "no-store",
+        credentials: "same-origin",
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok === false) {
@@ -1411,16 +1234,6 @@ function createCloudbaseApiClient(config) {
       }
       return data;
     },
-    async login(accountName, password) {
-      const response = await this.request("POST", "/login", { accountName, password });
-      this.setSession(response.session);
-      return response.session;
-    },
-    async register(accountName, password) {
-      const response = await this.request("POST", "/register", { accountName, password });
-      this.setSession(response.session);
-      return response.session;
-    },
     async me() {
       const response = await this.request("GET", "/me");
       return {
@@ -1428,9 +1241,6 @@ function createCloudbaseApiClient(config) {
         ownerId: response.user.ownerId,
         accountName: response.user.accountName,
       };
-    },
-    async updatePassword(password) {
-      await this.request("POST", "/password", { password });
     },
   };
 }

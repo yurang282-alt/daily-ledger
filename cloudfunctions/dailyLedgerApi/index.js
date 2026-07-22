@@ -5,6 +5,9 @@ const { URL, URLSearchParams } = require("node:url");
 const SESSION_TTL_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_BODY_LENGTH = 2 * 1024 * 1024;
 const PAGE_SIZE = 100;
+const ROCKY_IDENTITY_SESSION_URL = "https://rocky4ai.com/account/api/identity/session?appId=money";
+const ROCKY_USER_ID_PATTERN = /^ru_[A-Za-z0-9_-]{8,120}$/;
+const TRUSTED_ORIGIN = "https://rocky4ai.com";
 
 const COLLECTIONS = {
   users: "daily_ledger_users",
@@ -49,9 +52,11 @@ function getDb() {
 }
 
 function applyCorsHeaders(res) {
-  res.setHeader("access-control-allow-origin", "*");
-  res.setHeader("access-control-allow-headers", "content-type, authorization, x-daily-ledger-session");
+  // The production client is same-origin. Omitting Access-Control-Allow-Origin
+  // keeps the legacy direct CloudBase endpoint unavailable to foreign pages.
+  res.setHeader("access-control-allow-headers", "content-type");
   res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("vary", "Origin");
 }
 
 function sendJson(res, statusCode, payload) {
@@ -170,6 +175,59 @@ function newAuthError(message) {
   const error = new Error(message);
   error.statusCode = 401;
   return error;
+}
+
+async function requireRockyIdentity(req) {
+  const cookie = `${req.headers.cookie || ""}`;
+  if (!cookie) throw newAuthError("请先登录 Rocky 账号");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(ROCKY_IDENTITY_SESSION_URL, {
+      method: "GET",
+      headers: { cookie },
+      cache: "no-store",
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    if (response.status === 401 || response.status === 403) {
+      const error = newAuthError("Rocky 账号无效或未获 Money 授权");
+      error.statusCode = response.status;
+      throw error;
+    }
+    if (!response.ok) {
+      const error = new Error("统一账号服务暂时不可用");
+      error.statusCode = 503;
+      throw error;
+    }
+
+    const rockyUserId = `${response.headers.get("x-rocky-user-id") || ""}`;
+    const appId = `${response.headers.get("x-rocky-app-id") || ""}`;
+    const scopes = `${response.headers.get("x-rocky-scopes") || ""}`.split(",").filter(Boolean);
+    if (!ROCKY_USER_ID_PATTERN.test(rockyUserId) || appId !== "money" || !scopes.includes("session:read")) {
+      const error = new Error("统一账号返回格式无效");
+      error.statusCode = 502;
+      throw error;
+    }
+    return Object.freeze({ ownerId: rockyUserId, accountName: "Rocky 统一账号" });
+  } catch (error) {
+    if (error.statusCode) throw error;
+    const unavailable = new Error("统一账号服务暂时不可用");
+    unavailable.statusCode = 503;
+    throw unavailable;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function requireTrustedWriteOrigin(req) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return;
+  if (`${req.headers.origin || ""}` !== TRUSTED_ORIGIN) {
+    const error = new Error("请求来源不受信任");
+    error.statusCode = 403;
+    throw error;
+  }
 }
 
 function toNumber(value, fallback = 0) {
@@ -482,33 +540,11 @@ async function routeRequest(req, res) {
       return;
     }
 
-    if (req.method === "POST" && path === "/register") {
-      assertSessionSecretReady(db);
-      const body = await readJsonBody(req);
-      const user = await createUser(db, body.accountName, body.password);
-      sendJson(res, 200, { ok: true, session: createSessionForUser(user) });
-      return;
-    }
-
-    if (req.method === "POST" && path === "/login") {
-      assertSessionSecretReady(db);
-      const body = await readJsonBody(req);
-      const user = await loginUser(db, body.accountName, body.password);
-      sendJson(res, 200, { ok: true, session: createSessionForUser(user) });
-      return;
-    }
-
-    const session = getSessionFromRequest(req);
+    const session = await requireRockyIdentity(req);
+    requireTrustedWriteOrigin(req);
 
     if (req.method === "GET" && path === "/me") {
       sendJson(res, 200, { ok: true, user: { accountName: session.accountName, ownerId: session.ownerId } });
-      return;
-    }
-
-    if (req.method === "POST" && path === "/password") {
-      const body = await readJsonBody(req);
-      await updatePassword(db, session, body.password);
-      sendJson(res, 200, { ok: true });
       return;
     }
 

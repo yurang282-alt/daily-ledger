@@ -141,3 +141,11 @@ Boundaries:
 - The design agent defines design DNA, audits UI/UX fit, and produces design recommendations.
 - The main product partner + CTO agent still decides priority, product scope, architecture, release, and whether implementation should start.
 - The design agent does not publish, merge, deploy, change databases, or change permissions by default.
+
+## Rocky SSO batch status — 2026-07-22
+
+- `/apps/ledger/` locally uses central `appId=money`; old username/password routes and legacy browser token cannot authorize the central mode.
+- The backend derives `ownerId` only from the central `rockyUserId`; the browser cannot submit or select another owner.
+- Records, categories and budget state are namespaced by central owner. Existing unscoped local data and legacy backend records remain frozen, with no automatic merge.
+- Foreign-origin mutations fail closed; Service Worker cleanup is exact-path only.
+- A/B synthetic owner isolation and failure tests pass. No commit, push, deployment or production ledger read/write occurred.
