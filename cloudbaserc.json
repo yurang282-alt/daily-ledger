@@ -5,7 +5,7 @@
   "functions": [
     {
       "name": "rockyMoneyPersonalWeb",
-      "dir": "dailyLedgerApi",
+      "dir": "cloudfunctions/dailyLedgerApi",
       "type": "HTTP",
       "runtime": "Nodejs20.19",
       "handler": "index.main",
