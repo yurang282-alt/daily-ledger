@@ -2,7 +2,7 @@
 
 ## One-Liner
 
-每日收支 is a mobile-first lightweight bookkeeping web app for personal income and expense tracking, supporting local ledger use and optional CloudBase cloud sync.
+每日收支 is a mobile-first personal ledger using Rocky central identity and CloudBase-only personal data.
 
 ## User And Problem
 
@@ -13,15 +13,15 @@
 
 ## Product Shape
 
-- Core flow: Open app -> add income/expense record -> choose category/date/note -> review monthly totals and budget -> optionally log in -> sync local ledger to cloud -> export JSON if needed.
-- Must-have: Local ledger, income/expense records, categories, monthly budget/settings, CloudBase username/password auth, cloud sync, rollback on failed cloud save, JSON export with schema version, PWA install metadata.
+- Core flow: Sign in once at Rocky account -> open Money without another login -> add/review income and expense records -> export JSON if needed.
+- Must-have: Central `money` grant, owner-scoped CloudBase records/categories/settings, rollback on failed cloud save, JSON export, PWA metadata.
 - Explicit non-goals: Investment advice, bank-card aggregation, automatic transaction import, multi-user family sharing, complex accounting, or storing privileged CloudBase/API secrets in the client.
-- Important states: Local-only use, logged-in cloud sync, existing local ledger prompt before sync, failed cloud save rollback, PWA install on mobile.
+- Important states: central session valid, no grant, identity/backend unavailable, failed cloud save rollback, PWA install on mobile.
 
 ## Current Status
 
-- Stage: Usable static mobile web/PWA with local ledger and verified CloudBase API sync.
-- Working version: `v0.3.3` uses CloudBase `daily-ledger-api` for active cloud auth/data, while keeping local ledger, username/password login, password change, local-to-cloud merge prompt, rollback on failed cloud write, JSON export schema version, PWA installation, responsive desktop workspace, and mobile history/backup entry.
+- Stage: CloudBase-only Rocky unified-login production canary package.
+- Working version: `v0.4.0-sso`; central account is the only active identity, and backend failures do not fall back to legacy local/account state.
 - Local state: Open `index.html` directly or serve locally at `http://127.0.0.1:4173`.
 - GitHub state: `main` is the release branch; use `git log -1 --oneline` for the current immutable commit reference. `codex/username-password-auth` remains historical context only.
 - Deployment state: CloudBase `/apps/ledger/` is the primary production path; Vercel remains an optional mirror.
@@ -38,22 +38,22 @@
 - Daily Bookkeeping CloudBase path: `/apps/ledger/`.
 - CloudBase default domains, test domains, and `localhost` are for development or evidence only; they must not be handed to users as the formal product entry.
 - Web internal navigation should prefer same-origin relative paths such as `/apps/<app-name>/`; do not hard-code CloudBase test domains or invent DNS subdomains inside this project.
-- Unified domain does not mean unified accounts, databases, or user data. Do not add shared identity, shared data, or cross-app sync just because the domain is unified.
+- The shared Rocky session is the approved identity layer; Money business data stays in Money-owned collections and is not a cross-App database.
 - DNS, certificates, domain binding, and root publishing are owned by CTO / `app-factory`; this project must not modify them.
 - Every future release must distinguish local files, Git, remote `main`, deployment, and user-visible version, then verify the exact `https://rocky4ai.com/apps/ledger/` entry.
 
 ## Architecture
 
 - Client/platform: Static mobile-first web app / PWA.
-- Backend/data: Local browser ledger plus optional CloudBase HTTP API persistence.
-- Auth/identity: CloudBase `daily-ledger-api` username/password auth; the API stores salted password hashes and signs long-lived session tokens; no real user email or verification code required.
-- Storage: Local ledger data object includes records, categories, and budget/settings. CloudBase collections are `daily_ledger_users`, `daily_ledger_records`, `daily_ledger_categories`, and `daily_ledger_settings`.
+- Backend/data: CloudBase HTTP API and Money-owned personal collections.
+- Auth/identity: Rocky central account plus server-side `money` grant; no Money-specific password or token.
+- Storage: `rocky_money_personal_records`, `rocky_money_personal_categories`, and `rocky_money_personal_settings`, all scoped by server-derived `rockyUserId`.
 - External services: CloudBase HTTP function/database/static hosting; Vercel static hosting optional as a mirror.
 - Key constraints: `config.js` must only contain browser-safe CloudBase API URL, never function secrets or privileged cloud credentials. All finance data reads/writes must go through `daily-ledger-api` and include server-side owner scoping.
 
 ## Decisions
 
-- Chosen path: Keep a static web/PWA app with local-first data and optional CloudBase sync.
+- Chosen path: Keep the static web/PWA surface while making CloudBase owner-scoped data the only formal runtime.
 - Rejected paths: Do not add bank automation, investments, family sharing, or complex accounting before data correctness, privacy, export, and recovery are strong.
 - Why: Personal finance data needs reliability and privacy more than feature breadth. CloudBase removes the VPN dependency while keeping the PWA surface and JSON backup path.
 - Revisit trigger: Before exposing to friends, moving to Mini Program, adding recurring records, or changing backend.
@@ -81,7 +81,7 @@
 - Legacy Supabase schema: `supabase.schema.sql`
 - CloudBase API: `cloudfunctions/dailyLedgerApi`
 - PWA manifest: `manifest.json`
-- Deployment: CloudBase static hosting `/apps/ledger/` plus HTTP function `daily-ledger-api`; Vercel is optional mirror only.
+- Deployment: central formal web route `/apps/ledger/` plus new HTTP function `rockyMoneyPersonalWeb` exposed only through `/daily-ledger-api`; legacy functions and data remain frozen.
 
 ## CloudBase Resource Ownership
 
@@ -141,3 +141,11 @@ Boundaries:
 - The design agent defines design DNA, audits UI/UX fit, and produces design recommendations.
 - The main product partner + CTO agent still decides priority, product scope, architecture, release, and whether implementation should start.
 - The design agent does not publish, merge, deploy, change databases, or change permissions by default.
+
+## Rocky SSO batch status — 2026-07-22
+
+- `/apps/ledger/` uses central `appId=money`; old username/password routes and legacy browser token cannot authorize the central mode.
+- The backend derives `ownerId` only from the central `rockyUserId`; the browser cannot submit or select another owner.
+- New records use `rocky_money_personal_*` collections and are namespaced by central owner. Existing unscoped local data and legacy backend records remain frozen, with no automatic merge or fallback.
+- Foreign-origin mutations fail closed; Service Worker cleanup is exact-path only.
+- A/B synthetic owner isolation and failure tests pass. Production truth is recorded by the central Rocky release evidence.

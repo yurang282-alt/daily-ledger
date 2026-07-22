@@ -18,7 +18,11 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  if (request.method !== "GET" || url.origin !== self.location.origin) {
+  if (
+    request.method !== "GET"
+    || url.origin !== self.location.origin
+    || !url.pathname.startsWith(APP_SCOPE_PATH)
+  ) {
     return;
   }
 

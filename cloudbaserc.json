@@ -4,14 +4,14 @@
   "functionRoot": "cloudfunctions",
   "functions": [
     {
-      "name": "daily-ledger-api",
+      "name": "rockyMoneyPersonalWeb",
       "dir": "dailyLedgerApi",
       "type": "HTTP",
       "runtime": "Nodejs20.19",
       "handler": "index.main",
       "timeout": 30,
       "memorySize": 256,
-      "description": "Daily Ledger CloudBase H5 API"
+      "description": "Rocky Money CloudBase 个人数据 API（A/B 灰度）"
     }
   ]
 }

@@ -1,16 +1,16 @@
-const crypto = require("node:crypto");
 const { Readable } = require("node:stream");
 const { URL, URLSearchParams } = require("node:url");
 
-const SESSION_TTL_MS = 180 * 24 * 60 * 60 * 1000;
 const MAX_BODY_LENGTH = 2 * 1024 * 1024;
 const PAGE_SIZE = 100;
+const ROCKY_IDENTITY_SESSION_URL = "https://rocky4ai.com/account/api/identity/session?appId=money";
+const ROCKY_USER_ID_PATTERN = /^ru_[A-Za-z0-9_-]{8,120}$/;
+const TRUSTED_ORIGIN = "https://rocky4ai.com";
 
 const COLLECTIONS = {
-  users: "daily_ledger_users",
-  records: "daily_ledger_records",
-  categories: "daily_ledger_categories",
-  settings: "daily_ledger_settings",
+  records: "rocky_money_personal_records",
+  categories: "rocky_money_personal_categories",
+  settings: "rocky_money_personal_settings",
 };
 
 const DEFAULT_CATEGORIES = {
@@ -19,7 +19,6 @@ const DEFAULT_CATEGORIES = {
 };
 
 const memoryStore = {
-  users: [],
   records: [],
   categories: [],
   settings: [],
@@ -40,7 +39,12 @@ function getCloud() {
 
 function getDb() {
   const cloud = getCloud();
-  if (!cloud) return null;
+  if (!cloud) {
+    if (process.env.ROCKY_SYNTHETIC_TEST_MODE === "true") return null;
+    const error = new Error("CloudBase 数据服务不可用");
+    error.statusCode = 503;
+    throw error;
+  }
   if (!cloudInitDone) {
     cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
     cloudInitDone = true;
@@ -49,9 +53,11 @@ function getDb() {
 }
 
 function applyCorsHeaders(res) {
-  res.setHeader("access-control-allow-origin", "*");
-  res.setHeader("access-control-allow-headers", "content-type, authorization, x-daily-ledger-session");
+  // The production client is same-origin. Omitting Access-Control-Allow-Origin
+  // keeps the legacy direct CloudBase endpoint unavailable to foreign pages.
+  res.setHeader("access-control-allow-headers", "content-type");
   res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("vary", "Origin");
 }
 
 function sendJson(res, statusCode, payload) {
@@ -77,99 +83,63 @@ function sanitizeText(value, maxLength = 120) {
   return `${value || ""}`.trim().slice(0, maxLength);
 }
 
-function normalizeAccountName(value) {
-  return sanitizeText(value, 40);
-}
-
-function normalizeAccountKey(value) {
-  return normalizeAccountName(value).toLowerCase();
-}
-
-function isValidAccountName(value) {
-  const account = normalizeAccountName(value);
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account) || /^[\p{L}\p{N}_-]{2,32}$/u.test(account);
-}
-
-function hash(value) {
-  return crypto.createHash("sha256").update(`${value || ""}`).digest("hex");
-}
-
-function shortHash(value) {
-  return hash(value).slice(0, 24);
-}
-
-function ownerIdForAccount(accountName) {
-  return `ledger_${shortHash(normalizeAccountKey(accountName))}`;
-}
-
-function timingSafeEqualString(a, b) {
-  const left = Buffer.from(`${a || ""}`);
-  const right = Buffer.from(`${b || ""}`);
-  return left.length === right.length && crypto.timingSafeEqual(left, right);
-}
-
-function createPasswordHash(password, salt = crypto.randomBytes(16).toString("hex")) {
-  const passwordHash = crypto.pbkdf2Sync(`${password || ""}`, salt, 120000, 32, "sha256").toString("hex");
-  return { salt, passwordHash };
-}
-
-function verifyPassword(password, user) {
-  if (!user?.passwordSalt || !user?.passwordHash) return false;
-  const { passwordHash } = createPasswordHash(password, user.passwordSalt);
-  return timingSafeEqualString(passwordHash, user.passwordHash);
-}
-
-function getSessionSecret() {
-  const secret = process.env.DAILY_LEDGER_SESSION_SECRET || process.env.APP_SESSION_SECRET || "";
-  if (secret) return secret;
-  if (getDb()) {
-    throw new Error("服务端未配置会话密钥");
-  }
-  return "daily-ledger-local-dev-session";
-}
-
-function assertSessionSecretReady(db) {
-  if (db && !(process.env.DAILY_LEDGER_SESSION_SECRET || process.env.APP_SESSION_SECRET)) {
-    throw new Error("服务端未配置会话密钥");
-  }
-}
-
-function base64UrlEncode(value) {
-  return Buffer.from(value).toString("base64url");
-}
-
-function base64UrlDecode(value) {
-  return Buffer.from(value, "base64url").toString("utf8");
-}
-
-function signSession(payload) {
-  const encoded = base64UrlEncode(JSON.stringify({ ...payload, exp: Date.now() + SESSION_TTL_MS }));
-  const signature = crypto.createHmac("sha256", getSessionSecret()).update(encoded).digest("base64url");
-  return `${encoded}.${signature}`;
-}
-
-function verifySessionToken(token) {
-  const [encoded, signature] = `${token || ""}`.split(".");
-  if (!encoded || !signature) throw newAuthError("请先登录");
-  const expected = crypto.createHmac("sha256", getSessionSecret()).update(encoded).digest("base64url");
-  if (!timingSafeEqualString(expected, signature)) throw newAuthError("登录已失效，请重新登录");
-  const payload = JSON.parse(base64UrlDecode(encoded));
-  if (!payload.ownerId || Number(payload.exp || 0) < Date.now()) {
-    throw newAuthError("登录已过期，请重新登录");
-  }
-  return payload;
-}
-
-function getSessionFromRequest(req) {
-  const headerToken = req.headers["x-daily-ledger-session"] || req.headers.authorization;
-  const token = `${headerToken || ""}`.replace(/^Bearer\s+/i, "").trim();
-  return verifySessionToken(token);
-}
-
 function newAuthError(message) {
   const error = new Error(message);
   error.statusCode = 401;
   return error;
+}
+
+async function requireRockyIdentity(req) {
+  const cookie = `${req.headers.cookie || ""}`;
+  if (!cookie) throw newAuthError("请先登录 Rocky 账号");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(ROCKY_IDENTITY_SESSION_URL, {
+      method: "GET",
+      headers: { cookie },
+      cache: "no-store",
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    if (response.status === 401 || response.status === 403) {
+      const error = newAuthError("Rocky 账号无效或未获 Money 授权");
+      error.statusCode = response.status;
+      throw error;
+    }
+    if (!response.ok) {
+      const error = new Error("统一账号服务暂时不可用");
+      error.statusCode = 503;
+      throw error;
+    }
+
+    const rockyUserId = `${response.headers.get("x-rocky-user-id") || ""}`;
+    const appId = `${response.headers.get("x-rocky-app-id") || ""}`;
+    const scopes = `${response.headers.get("x-rocky-scopes") || ""}`.split(",").filter(Boolean);
+    if (!ROCKY_USER_ID_PATTERN.test(rockyUserId) || appId !== "money" || !scopes.includes("session:read")) {
+      const error = new Error("统一账号返回格式无效");
+      error.statusCode = 502;
+      throw error;
+    }
+    return Object.freeze({ ownerId: rockyUserId, accountName: "Rocky 统一账号" });
+  } catch (error) {
+    if (error.statusCode) throw error;
+    const unavailable = new Error("统一账号服务暂时不可用");
+    unavailable.statusCode = 503;
+    throw unavailable;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function requireTrustedWriteOrigin(req) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return;
+  if (`${req.headers.origin || ""}` !== TRUSTED_ORIGIN) {
+    const error = new Error("请求来源不受信任");
+    error.statusCode = 403;
+    throw error;
+  }
 }
 
 function toNumber(value, fallback = 0) {
@@ -309,68 +279,6 @@ async function dbRemove(db, collectionName, query) {
   await Promise.all(rows.filter((row) => row._id).map((row) => db.collection(COLLECTIONS[collectionName]).doc(row._id).remove()));
 }
 
-async function getUserByAccount(db, accountName) {
-  return dbFindOne(db, "users", { accountKey: normalizeAccountKey(accountName) });
-}
-
-async function createUser(db, accountName, password) {
-  if (!isValidAccountName(accountName)) throw new Error("账号名格式不正确");
-  if (!password || `${password}`.length < 6) throw new Error("密码至少 6 位");
-  const existing = await getUserByAccount(db, accountName);
-  if (existing) throw new Error("这个账号已经注册过，请直接登录");
-  const now = new Date().toISOString();
-  const ownerId = ownerIdForAccount(accountName);
-  const { salt, passwordHash } = createPasswordHash(password);
-  const user = await dbUpsert(db, "users", { ownerId }, {
-    ownerId,
-    accountName: normalizeAccountName(accountName),
-    accountKey: normalizeAccountKey(accountName),
-    passwordSalt: salt,
-    passwordHash,
-    createdAt: now,
-    updatedAt: now,
-    lastLoginAt: now,
-  });
-  return user;
-}
-
-async function loginUser(db, accountName, password) {
-  const user = await getUserByAccount(db, accountName);
-  if (!user || !verifyPassword(password, user)) throw newAuthError("账号名或密码不对");
-  const now = new Date().toISOString();
-  await dbUpsert(db, "users", { ownerId: user.ownerId }, {
-    ...user,
-    lastLoginAt: now,
-    updatedAt: now,
-  });
-  return { ...user, lastLoginAt: now, updatedAt: now };
-}
-
-async function updatePassword(db, session, password) {
-  if (!password || `${password}`.length < 6) throw new Error("密码至少 6 位");
-  const user = await dbFindOne(db, "users", { ownerId: session.ownerId });
-  if (!user) throw newAuthError("请先登录");
-  const { salt, passwordHash } = createPasswordHash(password);
-  await dbUpsert(db, "users", { ownerId: session.ownerId }, {
-    ...user,
-    passwordSalt: salt,
-    passwordHash,
-    updatedAt: new Date().toISOString(),
-  });
-}
-
-function createSessionForUser(user) {
-  const session = {
-    ownerId: user.ownerId,
-    accountName: user.accountName,
-  };
-  return {
-    token: signSession(session),
-    ownerId: user.ownerId,
-    accountName: user.accountName,
-  };
-}
-
 async function readLedger(db, ownerId) {
   const [records, categories, settings] = await Promise.all([
     dbFindMany(db, "records", { ownerId }, "date"),
@@ -472,43 +380,21 @@ async function routeRequest(req, res) {
     return;
   }
 
-  const db = getDb();
   const parsedUrl = new URL(req.url, "http://localhost");
   const path = normalizePath(parsedUrl.pathname);
 
   try {
+    const db = getDb();
     if (req.method === "GET" && path === "/health") {
       sendJson(res, 200, { ok: true, mode: db ? "cloudbase" : "local-memory" });
       return;
     }
 
-    if (req.method === "POST" && path === "/register") {
-      assertSessionSecretReady(db);
-      const body = await readJsonBody(req);
-      const user = await createUser(db, body.accountName, body.password);
-      sendJson(res, 200, { ok: true, session: createSessionForUser(user) });
-      return;
-    }
-
-    if (req.method === "POST" && path === "/login") {
-      assertSessionSecretReady(db);
-      const body = await readJsonBody(req);
-      const user = await loginUser(db, body.accountName, body.password);
-      sendJson(res, 200, { ok: true, session: createSessionForUser(user) });
-      return;
-    }
-
-    const session = getSessionFromRequest(req);
+    const session = await requireRockyIdentity(req);
+    requireTrustedWriteOrigin(req);
 
     if (req.method === "GET" && path === "/me") {
       sendJson(res, 200, { ok: true, user: { accountName: session.accountName, ownerId: session.ownerId } });
-      return;
-    }
-
-    if (req.method === "POST" && path === "/password") {
-      const body = await readJsonBody(req);
-      await updatePassword(db, session, body.password);
-      sendJson(res, 200, { ok: true });
       return;
     }
 
